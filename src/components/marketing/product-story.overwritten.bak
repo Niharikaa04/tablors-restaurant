@@ -1,0 +1,199 @@
+"use client";
+
+import { useState } from "react";
+import { Reveal } from "./motion/reveal";
+import { StaggerGroup, StaggerItem } from "./motion/stagger";
+
+const highlights = [
+  {
+    number: "01",
+    title: "The Tablor Device",
+    body: "A book-shaped digital menu sits on every table, giving guests everything they need to browse, select and order.",
+    accent: "var(--color-gold-500)",
+  },
+  {
+    number: "02",
+    title: "Browse & Select",
+    body: "Menu pages are organised by category. Every dish has a simple item code, so guests select what they want using numbers and quantities.",
+    accent: "var(--mkt-lime)",
+  },
+  {
+    number: "03",
+    title: "Build Your Order",
+    body: "Selected items appear on the device with quantities and a running total, so the table always knows exactly what it is ordering.",
+    accent: "var(--mkt-lime)",
+  },
+  {
+    number: "04",
+    title: "Confirm & Send",
+    body: "Nothing reaches the kitchen until the table taps Confirm Order. The moment it does, the order is sent instantly.",
+    accent: "var(--mkt-lime)",
+  },
+  {
+    number: "05",
+    title: "Kitchen Display",
+    body: "The kitchen sees the same order instantly — table number, items and quantities — and moves it from New to Preparing to Ready.",
+    accent: "var(--color-radium-500)",
+  },
+  {
+    number: "06",
+    title: "Owner Dashboard",
+    body: "Orders, tables, bills and menu availability flow into one dashboard, keeping the entire restaurant connected.",
+    accent: "var(--color-gold-500)",
+  },
+];
+
+export function ProductIntro() {
+  const [active, setActive] = useState<number | null>(null);
+
+  return (
+    <section
+      id="product"
+      className="snap-section border-t border-[var(--color-border)] px-6 py-24"
+    >
+      <div className="mx-auto max-w-6xl">
+
+        <Reveal className="max-w-2xl">
+          <p className="text-xs uppercase tracking-[0.3em] text-[var(--mkt-lime)]">
+            How Tablor works
+          </p>
+
+          <h2
+            className="mt-4 text-4xl leading-[1.05] tracking-tight text-[var(--color-text-primary)] sm:text-5xl"
+            style={{
+              fontFamily:
+                "ui-serif, Georgia, 'Times New Roman', serif",
+            }}
+          >
+            One table. Six connected moments.
+          </h2>
+
+          <p className="mt-5 max-w-xl text-base leading-relaxed text-[var(--color-text-secondary)]">
+            From the first touch on the table device to the final order
+            reaching the kitchen and owner, everything stays connected.
+          </p>
+        </Reveal>
+
+        {/* Group wrapper: resets the highlight when the pointer or focus leaves all six cells. */}
+        <div
+          onPointerLeave={(e) => {
+            if (e.pointerType === "mouse") setActive(null);
+          }}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setActive(null);
+          }}
+        >
+          <StaggerGroup className="mt-16 grid gap-px overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-border)] sm:grid-cols-2 lg:grid-cols-3">
+            {highlights.map((item, index) => {
+              const isActive = active === index;
+              const isDimmed = active !== null && !isActive;
+
+              return (
+                <StaggerItem key={item.number}>
+                  <button
+                    type="button"
+                    onPointerEnter={(e) => {
+                      if (e.pointerType === "mouse") setActive(index);
+                    }}
+                    onFocus={(e) => {
+                      if (e.currentTarget.matches(":focus-visible")) setActive(index);
+                    }}
+                    className="group relative flex min-h-[280px] w-full flex-col justify-between text-left outline-none transition-colors duration-[400ms] ease-out focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--mkt-lime)] motion-reduce:transition-none"
+                    style={{
+                      background: isActive
+                        ? "var(--color-surface-1)"
+                        : "var(--mkt-stage)",
+                    }}
+                  >
+                    {/* active glow (driven by state so it also shows on keyboard focus) */}
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 transition-opacity duration-[400ms] ease-out motion-reduce:transition-none"
+                      style={{
+                        opacity: isActive ? 1 : 0,
+                        boxShadow: `inset 0 0 80px color-mix(in srgb, ${item.accent} 10%, transparent)`,
+                      }}
+                    />
+
+                    {/*
+                      Dim + lift apply to the content only. Lifting or fading the
+                      whole cell would clip against the grid's overflow-hidden and
+                      let the 1px border background show through.
+                    */}
+                    <div
+                      className="relative p-7 transition-[transform,opacity,filter] duration-[400ms] ease-out will-change-transform motion-reduce:transition-none"
+                      style={{
+                        transform: isActive ? "translateY(-3px)" : "translateY(0)",
+                        opacity: isDimmed ? 0.6 : 1,
+                        filter: isDimmed ? "saturate(0.7)" : "none",
+                      }}
+                    >
+
+                      <div className="flex items-center justify-between">
+                        <span
+                          className="text-[10px] uppercase tracking-[0.25em] transition-colors duration-300"
+                          style={{
+                            color: isActive
+                              ? item.accent
+                              : "var(--color-text-muted)",
+                          }}
+                        >
+                          {item.number}
+                        </span>
+
+                        <span
+                          className="h-1.5 w-1.5 rounded-full transition-all duration-300"
+                          style={{
+                            background: item.accent,
+                            opacity: isActive ? 1 : 0.35,
+                            transform: isActive ? "scale(1.5)" : "scale(1)",
+                            boxShadow: isActive
+                              ? `0 0 12px ${item.accent}`
+                              : "none",
+                          }}
+                        />
+                      </div>
+
+                      <h3
+                        className="mt-12 text-2xl transition-all duration-300"
+                        style={{
+                          color: isActive
+                            ? "var(--color-text-primary)"
+                            : "var(--color-text-secondary)",
+                        }}
+                      >
+                        {item.title}
+                      </h3>
+
+                      <p
+                        className="mt-4 text-sm leading-relaxed transition-all duration-300"
+                        style={{
+                          color: isActive
+                            ? "var(--color-text-secondary)"
+                            : "var(--color-text-muted)",
+                        }}
+                      >
+                        {item.body}
+                      </p>
+                    </div>
+
+                    <div
+                      className="relative h-px w-full transition-all duration-[400ms] ease-out motion-reduce:transition-none"
+                      style={{
+                        background: isActive
+                          ? item.accent
+                          : "var(--color-border)",
+                        opacity: isActive ? 0.8 : 0.35,
+                      }}
+                    />
+                  </button>
+                </StaggerItem>
+              );
+            })}
+          </StaggerGroup>
+        </div>
+
+      </div>
+    </section>
+  );
+}

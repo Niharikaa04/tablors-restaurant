@@ -1,0 +1,129 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+type NotificationStatus =
+  | "unread"
+  | "read"
+  | "acknowledged"
+  | "resolved";
+
+type NotificationItem = {
+  id: string;
+  type: string;
+  priority: "low" | "medium" | "high" | "critical";
+  title: string;
+  message: string;
+  status: NotificationStatus;
+  createdAt: string;
+  tableId?: string | null;
+  orderId?: string | null;
+  deviceId?: string | null;
+};
+
+export function useNotifications(playSound = false) {
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const audio = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/notifications")
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("Failed to load notifications");
+        }
+
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) {
+          setItems(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setItems([]);
+        }
+      });
+
+    const es = new EventSource("/api/notifications/stream");
+
+    es.onmessage = (event) => {
+      try {
+        const notification = JSON.parse(event.data) as NotificationItem;
+
+        setItems((previous) => [
+          notification,
+          ...previous.filter(
+            (item) => item.id !== notification.id
+          ),
+        ]);
+
+        if (
+          playSound &&
+          notification.priority !== "low"
+        ) {
+          (
+            audio.current ??
+            (audio.current = new Audio("/sounds/alert.mp3"))
+          )
+            .play()
+            .catch(() => {});
+        }
+      } catch {
+        // Ignore malformed SSE messages.
+      }
+    };
+
+    es.onerror = () => {
+      // EventSource automatically attempts to reconnect.
+    };
+
+    return () => {
+      cancelled = true;
+      es.close();
+    };
+  }, [playSound]);
+
+  const setStatus = async (
+    id: string,
+    status: NotificationStatus
+  ) => {
+    const response = await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id,
+        status,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to update notification");
+    }
+
+    setItems((previous) =>
+      previous.map((notification) =>
+        notification.id === id
+          ? {
+              ...notification,
+              status,
+            }
+          : notification
+      )
+    );
+  };
+
+  const unread = items.filter(
+    (notification) => notification.status === "unread"
+  ).length;
+
+  return {
+    items,
+    unread,
+    setStatus,
+  };
+}
