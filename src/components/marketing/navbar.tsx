@@ -61,11 +61,11 @@ export function Navbar() {
           : "border-b border-transparent bg-transparent"
       }`}
     >
-      <nav className="mkt-container flex min-h-16 items-center justify-between py-3">
+      <nav className="mkt-container flex min-h-16 items-center justify-between gap-3 py-3">
         {/* Official Tablor's Logo */}
         <Link
           href="/"
-          className="flex shrink-0 items-center"
+          className="flex h-10 w-[100px] shrink-0 items-center sm:h-12 sm:w-[120px]"
           aria-label="Tablor's home"
         >
           <Image
@@ -74,6 +74,7 @@ export function Navbar() {
             width={120}
             height={48}
             priority
+            className="block h-auto max-h-10 w-[100px] max-w-full object-contain sm:max-h-12 sm:w-[120px]"
           />
         </Link>
 
@@ -92,7 +93,7 @@ export function Navbar() {
         </ul>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
           {/* Login */}
           <Link
             href="/login"
@@ -113,7 +114,7 @@ export function Navbar() {
           <CtaButton
             href="/order"
             glow="lime"
-            className="rounded-full bg-[var(--mkt-lime)] px-4 py-2 text-sm font-medium text-[var(--mkt-lime-ink)]"
+            className="shrink-0 rounded-full bg-[var(--mkt-lime)] px-3 py-2 text-xs font-medium text-[var(--mkt-lime-ink)] sm:px-4 sm:text-sm"
           >
             Get Started
           </CtaButton>
@@ -125,7 +126,7 @@ export function Navbar() {
             aria-expanded={menuOpen}
             aria-controls="mobile-nav"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
-            className="ml-1 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--mkt-border)] text-[var(--mkt-text-primary)] md:hidden"
+            className="ml-0 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--mkt-border)] text-[var(--mkt-text-primary)] md:hidden sm:h-11 sm:w-11"
           >
             <span className="sr-only">
               {menuOpen ? "Close menu" : "Open menu"}
