@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { CalendarX, CheckCircle2, LogIn, Plus, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CalendarDays, CalendarX, CheckCircle2, LogIn, Plus, Users } from "lucide-react";
 import {
   cancelReservationAction,
   checkInReservationAction,
@@ -10,8 +11,10 @@ import {
   type ReservationActionResult,
 } from "./actions";
 
+
 export interface ReservationRow {
   id: string;
+  tableId: string;
   timeLabel: string;
   tableLabel: string;
   guestName: string;
@@ -27,7 +30,9 @@ export interface TableOption {
   label: string;
 }
 
-type DialogState = { mode: "reserve" } | { mode: "cancel"; row: ReservationRow };
+type DialogState =
+  | { mode: "reserve"; tableId?: string }
+  | { mode: "cancel"; row: ReservationRow };
 
 const RESERVATION_LABEL: Record<ReservationRow["status"], string> = {
   booked: "Booked",
@@ -57,14 +62,29 @@ export function ReservationsManager({
   rows,
   tableOptions,
   dateLabel,
+  embedded = false,
+  autoOpenTableId,
 }: {
   rows: ReservationRow[];
   tableOptions: TableOption[];
   dateLabel: string;
+  /** True when shown inside the Tables & Devices page (heading drops to h2). */
+  embedded?: boolean;
+  /** Opens the Reserve form with this table preselected (from the table cards). */
+  autoOpenTableId?: string;
 }) {
-  const [dialog, setDialog] = useState<DialogState | null>(null);
+  const router = useRouter();
+  const [dialog, setDialog] = useState<DialogState | null>(
+    autoOpenTableId ? { mode: "reserve", tableId: autoOpenTableId } : null,
+  );
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  function closeDialog() {
+    setDialog(null);
+    // Clear ?reserve=... so a reload doesn't reopen the form.
+    if (autoOpenTableId) router.replace("/owner/tables#reservations");
+  }
 
   function run(action: () => Promise<ReservationActionResult>) {
     setNotice(null);
@@ -78,7 +98,11 @@ export function ReservationsManager({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-50">Reservations</h1>
+          {embedded ? (
+            <h2 className="text-2xl font-semibold text-zinc-50">Reservations</h2>
+          ) : (
+            <h1 className="text-2xl font-semibold text-zinc-50">Reservations</h1>
+          )}
           <p className="mt-1 text-sm text-zinc-400">Today&apos;s reservations · {dateLabel}</p>
         </div>
         <button
@@ -220,7 +244,11 @@ export function ReservationsManager({
       </div>
 
       {dialog?.mode === "reserve" && (
-        <ReserveDialog tableOptions={tableOptions} onClose={() => setDialog(null)} />
+        <ReserveDialog
+          tableOptions={tableOptions}
+          initialTableId={dialog.tableId}
+          onClose={closeDialog}
+        />
       )}
       {dialog?.mode === "cancel" && (
         <CancelDialog key={dialog.row.id} row={dialog.row} onClose={() => setDialog(null)} />
@@ -231,9 +259,11 @@ export function ReservationsManager({
 
 function ReserveDialog({
   tableOptions,
+  initialTableId,
   onClose,
 }: {
   tableOptions: TableOption[];
+  initialTableId?: string;
   onClose: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -274,7 +304,12 @@ function ReserveDialog({
 
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-zinc-400">Table</span>
-          <select name="tableId" required defaultValue={tableOptions[0]?.id} className={inputClass}>
+          <select
+            name="tableId"
+            required
+            defaultValue={initialTableId ?? tableOptions[0]?.id}
+            className={inputClass}
+          >
             {tableOptions.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.label}
@@ -353,9 +388,10 @@ function CancelDialog({ row, onClose }: { row: ReservationRow; onClose: () => vo
       aria-describedby="cancel-dialog-desc"
     >
       <div className="w-full max-w-md space-y-4 rounded-xl border border-zinc-800 bg-zinc-950 p-6">
-        <h2 id="cancel-dialog-title" className="text-lg font-semibold text-zinc-50">
-          Cancel reservation?
-        </h2>
+        <h2 className="flex items-center gap-2 text-2xl font-semibold text-zinc-50">
+  <CalendarDays className="h-5 w-5 text-[#d7fe3b]" aria-hidden="true" />
+  Reservations
+</h2>
         <p id="cancel-dialog-desc" className="text-sm text-zinc-400">
           <span className="text-zinc-100">{row.guestName}</span>&apos;s reservation at {row.timeLabel} for{" "}
           {row.tableLabel} will be cancelled. This cannot be undone.

@@ -1,3 +1,4 @@
+
 import type {
   Bill,
   Order,
@@ -9,8 +10,7 @@ import type {
 /**
  * Pure report calculations. No store imports (types only), so every
  * function is deterministic and unit-testable with injected data.
- * All day/week/month boundaries are computed in IST (India has no DST,
- * so a fixed +05:30 offset is exact).
+ * All day/week/month boundaries are computed in IST.
  */
 
 export const REPORT_PERIODS = ["today", "yesterday", "week", "month"] as const;
@@ -23,7 +23,6 @@ export const PERIOD_LABELS: Record<ReportPeriod, string> = {
   month: "This Month",
 };
 
-/** The order model has no "cancelled" status, so we never fabricate one. */
 export const CANCELLED_ORDERS_SUPPORTED = false;
 
 const IST_OFFSET_MS = 330 * 60 * 1000;
@@ -31,7 +30,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function parseReportPeriod(value: unknown): ReportPeriod {
   const v = Array.isArray(value) ? value[0] : value;
-  return typeof v === "string" && (REPORT_PERIODS as readonly string[]).includes(v)
+
+  return typeof v === "string" &&
+    (REPORT_PERIODS as readonly string[]).includes(v)
     ? (v as ReportPeriod)
     : "today";
 }
@@ -40,25 +41,36 @@ function startOfDayIST(ms: number): number {
   return Math.floor((ms + IST_OFFSET_MS) / DAY_MS) * DAY_MS - IST_OFFSET_MS;
 }
 
-export type PeriodRange = { start: number; end: number }; // [start, end)
+export type PeriodRange = {
+  start: number;
+  end: number;
+};
 
-export function getPeriodRange(period: ReportPeriod, now: number): PeriodRange {
+export function getPeriodRange(
+  period: ReportPeriod,
+  now: number,
+): PeriodRange {
   const today = startOfDayIST(now);
 
   switch (period) {
     case "today":
       return { start: today, end: today + DAY_MS };
+
     case "yesterday":
       return { start: today - DAY_MS, end: today };
+
     case "week": {
-      const dow = new Date(today + IST_OFFSET_MS).getUTCDay(); // 0 = Sun
-      const start = today - ((dow + 6) % 7) * DAY_MS; // Monday
+      const dow = new Date(today + IST_OFFSET_MS).getUTCDay();
+      const start = today - ((dow + 6) % 7) * DAY_MS;
+
       return { start, end: start + 7 * DAY_MS };
     }
+
     case "month": {
       const d = new Date(today + IST_OFFSET_MS);
       const y = d.getUTCFullYear();
       const m = d.getUTCMonth();
+
       return {
         start: Date.UTC(y, m, 1) - IST_OFFSET_MS,
         end: Date.UTC(y, m + 1, 1) - IST_OFFSET_MS,
@@ -75,7 +87,13 @@ export type ReportData = {
   tables: readonly RestaurantTable[];
 };
 
-export type PopularItem = { key: string; name: string; qtySold: number; revenueRupees: number };
+export type PopularItem = {
+  key: string;
+  name: string;
+  qtySold: number;
+  revenueRupees: number;
+};
+
 export type CategorySales = {
   category: string;
   orders: number;
@@ -83,6 +101,7 @@ export type CategorySales = {
   revenueRupees: number;
   sharePercent: number;
 };
+
 export type TableSales = {
   tableId: string;
   label: string;
@@ -90,7 +109,12 @@ export type TableSales = {
   revenueRupees: number;
   averageOrderValueRupees: number;
 };
-export type HourBucket = { hour: number; label: string; orders: number };
+
+export type HourBucket = {
+  hour: number;
+  label: string;
+  orders: number;
+};
 
 export type SalesReport = {
   period: ReportPeriod;
@@ -101,7 +125,10 @@ export type SalesReport = {
     collectedRupees: number;
     refundedRupees: number;
     netCollectedRupees: number;
-    collectedByMethod: { cash: number; upi: number; card: number };
+    collectedByMethod: {
+      cash: number;
+      qr: number;
+    };
     orderCount: number;
     orderValueRupees: number;
     averageOrderValueRupees: number;
@@ -133,112 +160,195 @@ function istHour(ms: number): number {
 }
 
 const orderValue = (o: Order): number =>
-  o.lines.reduce((sum, l) => sum + l.qty * l.priceRupees, 0);
+  o.lines.reduce((sum, line) => sum + line.qty * line.priceRupees, 0);
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 
 export function buildSalesReport(
   data: ReportData,
   period: ReportPeriod,
-  now: number = Date.now()
+  now: number = Date.now(),
 ): SalesReport {
   const range = getPeriodRange(period, now);
-  const orders = data.orders.filter((o) => o.createdAt >= range.start && o.createdAt < range.end);
+
+  const orders = data.orders.filter(
+    (o) => o.createdAt >= range.start && o.createdAt < range.end,
+  );
+
   const orderIds = new Set(orders.map((o) => o.id));
 
-  // ---- Sales: bills belonging to orders placed in the period ----
+  // Sales: bills belonging to orders placed during the selected period.
   const bills = data.bills.filter((b) => orderIds.has(b.orderId));
-  const totalSalesRupees = bills.reduce((s, b) => s + b.totalRupees, 0);
 
-  // ---- Collected: money actually received in the period ----
-  const collectedByMethod = { cash: 0, upi: 0, card: 0 };
-  for (const p of data.payments) {
-    if (p.paidAt >= range.start && p.paidAt < range.end && p.amountRupees > 0) {
-      collectedByMethod[p.method] += p.amountRupees;
+  const totalSalesRupees = bills.reduce(
+    (sum, bill) => sum + bill.totalRupees,
+    0,
+  );
+
+  // Collected: money actually received during the selected period.
+  // Supported payment methods: cash and qr only.
+  const collectedByMethod = {
+    cash: 0,
+    qr: 0,
+  };
+
+  for (const payment of data.payments) {
+    if (
+      payment.paidAt >= range.start &&
+      payment.paidAt < range.end &&
+      payment.amountRupees > 0
+    ) {
+      collectedByMethod[payment.method] += payment.amountRupees;
     }
   }
-  const collectedRupees = collectedByMethod.cash + collectedByMethod.upi + collectedByMethod.card;
-  const refundedRupees = data.refunds
-    .filter((r) => r.refundedAt >= range.start && r.refundedAt < range.end)
-    .reduce((s, r) => s + r.amountRupees, 0);
 
-  // ---- Single pass over lines for items / categories / tables / hours ----
+  const collectedRupees =
+    collectedByMethod.cash + collectedByMethod.qr;
+
+  const refundedRupees = data.refunds
+    .filter(
+      (refund) =>
+        refund.refundedAt >= range.start &&
+        refund.refundedAt < range.end,
+    )
+    .reduce((sum, refund) => sum + refund.amountRupees, 0);
+
+  // Calculate items, categories, tables, and hourly order counts.
   const items = new Map<string, PopularItem>();
-  const cats = new Map<string, CategorySales>();
-  const tableTotals = new Map<string, { orders: number; revenue: number }>();
-  const hourly: HourBucket[] = Array.from({ length: 24 }, (_, h) => ({
-    hour: h,
-    label: hourLabel(h),
+  const categoriesMap = new Map<string, CategorySales>();
+  const tableTotals = new Map<
+    string,
+    { orders: number; revenue: number }
+  >();
+
+  const hourly: HourBucket[] = Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    label: hourLabel(hour),
     orders: 0,
   }));
+
   let orderValueRupees = 0;
 
   for (const order of orders) {
     const value = orderValue(order);
+
     orderValueRupees += value;
     hourly[istHour(order.createdAt)].orders += 1;
 
-    const t = tableTotals.get(order.tableId) ?? { orders: 0, revenue: 0 };
-    t.orders += 1;
-    t.revenue += value;
-    tableTotals.set(order.tableId, t);
+    const table = tableTotals.get(order.tableId) ?? {
+      orders: 0,
+      revenue: 0,
+    };
 
-    const seenCats = new Set<string>();
+    table.orders += 1;
+    table.revenue += value;
+    tableTotals.set(order.tableId, table);
+
+    const seenCategories = new Set<string>();
+
     for (const line of order.lines) {
       const revenue = line.qty * line.priceRupees;
       const key = line.itemId ?? line.code;
-      const item = items.get(key);
-      if (item) {
-        item.qtySold += line.qty;
-        item.revenueRupees += revenue;
+      const existingItem = items.get(key);
+
+      if (existingItem) {
+        existingItem.qtySold += line.qty;
+        existingItem.revenueRupees += revenue;
       } else {
-        items.set(key, { key, name: line.name, qtySold: line.qty, revenueRupees: revenue });
+        items.set(key, {
+          key,
+          name: line.name,
+          qtySold: line.qty,
+          revenueRupees: revenue,
+        });
       }
 
       const category = line.category ?? "Other";
-      let c = cats.get(category);
-      if (!c) {
-        c = { category, orders: 0, qtySold: 0, revenueRupees: 0, sharePercent: 0 };
-        cats.set(category, c);
+      let categorySales = categoriesMap.get(category);
+
+      if (!categorySales) {
+        categorySales = {
+          category,
+          orders: 0,
+          qtySold: 0,
+          revenueRupees: 0,
+          sharePercent: 0,
+        };
+
+        categoriesMap.set(category, categorySales);
       }
-      c.qtySold += line.qty;
-      c.revenueRupees += revenue;
-      seenCats.add(category);
+
+      categorySales.qtySold += line.qty;
+      categorySales.revenueRupees += revenue;
+      seenCategories.add(category);
     }
-    for (const category of seenCats) cats.get(category)!.orders += 1;
+
+    for (const category of seenCategories) {
+      categoriesMap.get(category)!.orders += 1;
+    }
   }
 
   const popularItems = [...items.values()]
-    .sort((a, b) => b.qtySold - a.qtySold || b.revenueRupees - a.revenueRupees || a.name.localeCompare(b.name))
+    .sort(
+      (a, b) =>
+        b.qtySold - a.qtySold ||
+        b.revenueRupees - a.revenueRupees ||
+        a.name.localeCompare(b.name),
+    )
     .slice(0, 10);
 
-  const categories = [...cats.values()]
-    .map((c) => ({
-      ...c,
-      sharePercent: orderValueRupees > 0 ? round1((c.revenueRupees / orderValueRupees) * 100) : 0,
+  const categories = [...categoriesMap.values()]
+    .map((category) => ({
+      ...category,
+      sharePercent:
+        orderValueRupees > 0
+          ? round1(
+              (category.revenueRupees / orderValueRupees) * 100,
+            )
+          : 0,
     }))
     .sort((a, b) => b.revenueRupees - a.revenueRupees);
 
-  const labels = new Map(data.tables.map((t) => [t.id, t.label]));
+  const tableLabels = new Map(
+    data.tables.map((table) => [table.id, table.label]),
+  );
+
   const tables = [...tableTotals.entries()]
-    .map(([tableId, t]) => ({
+    .map(([tableId, totals]) => ({
       tableId,
-      label: labels.get(tableId) ?? tableId,
-      orders: t.orders,
-      revenueRupees: t.revenue,
-      averageOrderValueRupees: Math.round(t.revenue / t.orders),
+      label: tableLabels.get(tableId) ?? tableId,
+      orders: totals.orders,
+      revenueRupees: totals.revenue,
+      averageOrderValueRupees: Math.round(
+        totals.revenue / totals.orders,
+      ),
     }))
     .sort((a, b) => b.revenueRupees - a.revenueRupees);
 
-  const busiest = hourly.reduce((best, b) => (b.orders > best.orders ? b : best), hourly[0]);
+  const busiest = hourly.reduce(
+    (best, bucket) =>
+      bucket.orders > best.orders ? bucket : best,
+    hourly[0],
+  );
 
-  // ---- Table time: order placed -> bill settled ----
-  const billByOrder = new Map(data.bills.map((b) => [b.orderId, b]));
+  // Table time: order placed -> bill settled.
+  const billByOrder = new Map(
+    data.bills.map((bill) => [bill.orderId, bill]),
+  );
+
   const durations: number[] = [];
+
   for (const order of orders) {
     const bill = billByOrder.get(order.id);
-    if (bill && bill.paidAt !== null && bill.paidAt >= order.createdAt) {
-      durations.push((bill.paidAt - order.createdAt) / 60000);
+
+    if (
+      bill &&
+      bill.paidAt !== null &&
+      bill.paidAt >= order.createdAt
+    ) {
+      durations.push(
+        (bill.paidAt - order.createdAt) / 60000,
+      );
     }
   }
 
@@ -254,18 +364,26 @@ export function buildSalesReport(
       collectedByMethod,
       orderCount: orders.length,
       orderValueRupees,
-      averageOrderValueRupees: orders.length ? Math.round(orderValueRupees / orders.length) : 0,
+      averageOrderValueRupees: orders.length
+        ? Math.round(orderValueRupees / orders.length)
+        : 0,
     },
     popularItems,
     categories,
     tables,
     hourly,
     busiestHour: busiest.orders > 0 ? busiest : null,
-    cancelled: { supported: false, reason: CANCELLED_UNSUPPORTED_REASON },
+    cancelled: {
+      supported: false,
+      reason: CANCELLED_UNSUPPORTED_REASON,
+    },
     tableTime: durations.length
       ? {
           available: true,
-          averageMinutes: Math.round(durations.reduce((a, b) => a + b, 0) / durations.length),
+          averageMinutes: Math.round(
+            durations.reduce((sum, duration) => sum + duration, 0) /
+              durations.length,
+          ),
           sampleSize: durations.length,
         }
       : {

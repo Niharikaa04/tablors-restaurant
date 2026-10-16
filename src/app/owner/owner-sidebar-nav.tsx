@@ -5,14 +5,13 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Bell,
-  CalendarDays,
   ClipboardList,
   CreditCard,
+  Gift,
   Grid,
   LayoutDashboard,
   LifeBuoy,
   Settings,
-  Smartphone,
   Star,
   Tag,
   Users,
@@ -40,7 +39,7 @@ const navItems: NavItem[] = [
   },
   {
     href: "/owner/tables",
-    label: "Tables",
+    label: "Tables & Devices",
     icon: Grid,
   },
   {
@@ -59,14 +58,9 @@ const navItems: NavItem[] = [
     icon: Wallet,
   },
   {
-    href: "/owner/devices",
-    label: "Devices",
-    icon: Smartphone,
-  },
-  {
-    href: "/owner/reservations",
-    label: "Reservations",
-    icon: CalendarDays,
+    href: "/owner/loyalty",
+    label: "Loyalty",
+    icon: Gift,
   },
   {
     href: "/owner/notifications",

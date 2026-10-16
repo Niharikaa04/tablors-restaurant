@@ -1,4 +1,4 @@
-import { BookDeviceIllustration } from "./book-device-illustration";
+import { TablorDeviceImage } from "./tablor-device-image";
 import { CtaButton } from "./motion/cta-button";
 import { Reveal } from "./motion/reveal";
 
@@ -42,7 +42,12 @@ export function Contact() {
           delay={0.1}
           className="hidden justify-self-center md:block"
         >
-          <BookDeviceIllustration className="w-36 drop-shadow-[0_24px_40px_rgba(0,0,0,0.6)] lg:w-44" />
+          <div className="w-60 lg:w-80">
+            <TablorDeviceImage
+              sizes="(min-width: 1024px) 320px, 240px"
+              className="drop-shadow-[0_24px_40px_rgba(0,0,0,0.6)]"
+            />
+          </div>
         </Reveal>
       </div>
     </section>

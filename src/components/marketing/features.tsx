@@ -3,12 +3,11 @@ import { StaggerGroup, StaggerItem } from "./motion/stagger";
 
 // Every item below appears in the Tablor's product document.
 const features = [
-  { title: "Digital, paperless menu", body: "Guests flip through the menu page by page, and you go paperless." },
-  { title: "Quick ordering", body: "Guests pick items and quantities and send the order in seconds — less waiting, fewer mistakes." },
-  { title: "Live billing", body: "The total updates as guests order, so the bill is always accurate." },
-  { title: "QR code payment", body: "Guests scan a QR code and pay right at the table." },
-  { title: "Multi language", body: "Guests can order in the language they're comfortable with." },
-  { title: "Easy for everyone", body: "Simple enough for guests of every age to use on their own." },
+  { title: "Your Menu, Right Here", body: "Look through the dishes and see what you'd like to eat." },
+  { title: "Order Your Way", body: "Pick your dishes, choose how many you want, and place your order." },
+  { title: "Your Bill, Updated", body: "Add or remove items and see your bill change.." },
+  { title: "Scan & Pay", body: "Scan the QR code and pay using your UPI app." },
+  { title: "No Help Needed", body: "Everything is simple to follow, from choosing dishes to placing your order." },
 ];
 
 // "Why choose Tablor's?" — as listed in the product document.

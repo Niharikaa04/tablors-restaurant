@@ -53,8 +53,7 @@ export const reservationStatus = pgEnum("reservation_status", [
 
 export const paymentMethod = pgEnum("payment_method", [
   "cash",
-  "upi",
-  "card",
+  "qr",
 ]);
 
 export const paymentStatus = pgEnum("payment_status", [

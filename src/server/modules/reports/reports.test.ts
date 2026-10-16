@@ -94,7 +94,7 @@ const pay = (id: string, billId: string, method: Payment["method"], amt: number,
 
 const payments: Payment[] = [
   pay("p1", "b1", "cash", 340, ist(2026, 9, 16, 14, 10)),
-  pay("p2", "b1", "upi", 500, ist(2026, 9, 16, 14, 10)),
+  pay("p2", "b1", "qr", 500, ist(2026, 9, 16, 14, 10)),
   pay("p3", "b3", "cash", 105, ist(2026, 9, 15, 21, 0)),
 ];
 

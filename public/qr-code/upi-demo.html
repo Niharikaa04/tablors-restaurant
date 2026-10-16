@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>UPI QR Demo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body style="font-family:sans-serif; text-align:center; padding:40px;">
+  <h3>Pay Bill #<span id="billLabel"></span></h3>
+  <h1>₹<span id="amtLabel"></span></h1>
+  <div id="qr" style="display:inline-block;"></div>
+
+  <script>
+    const UPI_ID = "demo@upi";          // dummy ID for demo
+    const PAYEE_NAME = "Demo Restaurant";
+
+    function buildUpiLink(billId, amount) {
+      const params = new URLSearchParams({
+        pa: UPI_ID,
+        pn: PAYEE_NAME,
+        am: Number(amount).toFixed(2),
+        cu: "INR",
+        tn: "Bill " + billId,
+        tr: String(billId),
+      });
+      return "upi://pay?" + params.toString();
+    }
+
+    function showPayQr(billId, amount) {
+      document.getElementById("billLabel").textContent = billId;
+      document.getElementById("amtLabel").textContent = amount;
+      document.getElementById("qr").innerHTML = "";
+      new QRCode(document.getElementById("qr"), {
+        text: buildUpiLink(billId, amount),
+        width: 260,
+        height: 260,
+      });
+    }
+
+    showPayQr("b2", 704);
+  </script>
+</body>
+</html>

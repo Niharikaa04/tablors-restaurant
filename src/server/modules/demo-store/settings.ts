@@ -1,3 +1,4 @@
+
 /** DEMO restaurant settings store (in-memory). Keyed by restaurantId. */
 
 export interface RestaurantSettings {
@@ -14,9 +15,20 @@ export interface RestaurantSettings {
   pricesIncludeTax: boolean;
   currency: "INR" | "USD" | "EUR" | "GBP" | "AED";
   language: "en" | "hi" | "te";
-  printer: { enabled: boolean; paperWidthMm: 58 | 80; autoPrintOnPayment: boolean };
-  kitchen: { autoAcceptOrders: boolean; defaultPrepMinutes: number; soundAlerts: boolean };
-  payment: { cash: boolean; upi: boolean; card: boolean; upiId: string };
+  printer: {
+    enabled: boolean;
+    paperWidthMm: 58 | 80;
+    autoPrintOnPayment: boolean;
+  };
+  kitchen: {
+    autoAcceptOrders: boolean;
+    defaultPrepMinutes: number;
+    soundAlerts: boolean;
+  };
+  payment: {
+    cash: boolean;
+    qr: boolean;
+  };
 }
 
 const defaults = (): RestaurantSettings => ({
@@ -33,20 +45,41 @@ const defaults = (): RestaurantSettings => ({
   pricesIncludeTax: false,
   currency: "INR",
   language: "en",
-  printer: { enabled: true, paperWidthMm: 80, autoPrintOnPayment: false },
-  kitchen: { autoAcceptOrders: false, defaultPrepMinutes: 15, soundAlerts: true },
-  payment: { cash: true, upi: true, card: true, upiId: "" },
+  printer: {
+    enabled: true,
+    paperWidthMm: 80,
+    autoPrintOnPayment: false,
+  },
+  kitchen: {
+    autoAcceptOrders: false,
+    defaultPrepMinutes: 15,
+    soundAlerts: true,
+  },
+  payment: {
+    cash: true,
+    qr: true,
+  },
 });
 
-const g = globalThis as unknown as { __tablorsSettings?: Map<string, RestaurantSettings> };
+const g = globalThis as unknown as {
+  __tablorsSettings?: Map<string, RestaurantSettings>;
+};
+
 const map = () => (g.__tablorsSettings ??= new Map());
 
 export function getSettings(restaurantId: string): RestaurantSettings {
   const m = map();
-  if (!m.has(restaurantId)) m.set(restaurantId, defaults());
+
+  if (!m.has(restaurantId)) {
+    m.set(restaurantId, defaults());
+  }
+
   return structuredClone(m.get(restaurantId)!);
 }
 
-export function saveSettings(restaurantId: string, next: RestaurantSettings): void {
+export function saveSettings(
+  restaurantId: string,
+  next: RestaurantSettings,
+): void {
   map().set(restaurantId, structuredClone(next));
 }

@@ -33,8 +33,8 @@ export const beats = [
   {
     id: "device",
     kicker: "The device",
-    title: "A menu that opens like a book.",
-    body: "Menu pages above. A simple keypad below. The order builds live as guests choose.",
+    title: "A terminal at every table.",
+    body: "A numeric keypad, dedicated order buttons and a built-in display that shows the current order.",
   },
   {
     id: "menu",

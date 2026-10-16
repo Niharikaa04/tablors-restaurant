@@ -9,16 +9,13 @@ import {
   refundPayment,
 } from "@/server/modules/demo-store/store";
 import { notify } from "@/server/modules/notifications/store";
-
 import {
   onBillPaymentConfirmed,
   onPaymentRefunded,
 } from "@/server/modules/financial-pots/payment-hook";
 
-/** Payments are owner-only financial operations, checked on the server. */
 async function isOwner(): Promise<boolean> {
-  const role = await getDemoRole();
-  return role === "owner";
+  return (await getDemoRole()) === "owner";
 }
 
 function revalidatePaymentSurfaces(): void {
@@ -28,34 +25,69 @@ function revalidatePaymentSurfaces(): void {
   revalidatePath("/owner");
 }
 
-/** redirect() throws internally, so call it as the last statement of a branch. */
 function back(code: string, billId?: string): never {
   const params = new URLSearchParams({ notice: code });
 
-  if (billId) {
-    params.set("bill", billId);
-  }
+  if (billId) params.set("bill", billId);
 
   redirect(`/owner/payments?${params.toString()}`);
 }
 
 function readText(formData: FormData, key: string): string {
   const raw = formData.get(key);
-
   return typeof raw === "string" ? raw.trim() : "";
 }
 
-/** Missing, empty or non-numeric input returns null. */
 function readNumber(formData: FormData, key: string): number | null {
   const raw = readText(formData, key);
-
-  if (raw === "") {
-    return null;
-  }
+  if (raw === "") return null;
 
   const value = Number(raw);
-
   return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Table name for the notification, e.g. "Table 03".
+ * Reads tableLabel / tableName / tableId from the bill when present
+ * ("t03" and "03" both become "Table 03").
+ */
+function tableText(bill: object): string | null {
+  const b = bill as {
+    tableLabel?: unknown;
+    tableName?: unknown;
+    tableId?: unknown;
+  };
+
+  const raw = [b.tableLabel, b.tableName, b.tableId].find(
+    (value) => typeof value === "string" && value.trim() !== "",
+  ) as string | undefined;
+
+  if (!raw) return null;
+
+  const text = raw.trim();
+
+  if (/^table\b/i.test(text)) return text;
+
+  const digits = text.match(/^t?0*(\d+)$/i);
+
+  return digits
+    ? `Table ${digits[1].padStart(2, "0")}`
+    : `Table ${text}`;
+}
+
+/** Payment date and time, e.g. "14 Oct 2026, 5:19 PM" (India time). */
+function paymentDateTime(date: Date): string {
+  return date
+    .toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Kolkata",
+    })
+    .replace(/\b(am|pm)\b/i, (m) => m.toUpperCase());
 }
 
 function paymentFailureCode(reason: string): string {
@@ -98,60 +130,60 @@ function refundFailureCode(reason: string): string {
   }
 }
 
-/**
- * Records one payment (full or partial) against a bill. The bill, its
- * order/table, the method, the amount against the remaining balance and
- * the reference ID are all validated in the store — nothing the browser
- * sends is trusted as a total.
- */
-export async function recordPaymentAction(formData: FormData): Promise<void> {
-  if (!(await isOwner())) {
-    return back("forbidden");
-  }
+export async function recordPaymentAction(
+  formData: FormData,
+): Promise<void> {
+  if (!(await isOwner())) return back("forbidden");
 
   const billId = readText(formData, "billId");
+  if (!billId) return back("invalid");
 
-  if (billId === "") {
-    return back("invalid");
+  // Server-side allowlist: reject UPI, Card, and all unknown methods.
+  const method = readText(formData, "method");
+  if (method !== "cash" && method !== "qr") {
+    return back("invalid-method", billId);
   }
 
   const amount = readNumber(formData, "amountRupees");
-
-  if (amount === null) {
-    return back("invalid-amount", billId);
-  }
+  if (amount === null) return back("invalid-amount", billId);
 
   const result = recordBillPayment(billId, {
-    method: formData.get("method"),
+    method,
     amountRupees: amount,
     transactionId: formData.get("transactionId"),
   });
 
-  // Revalidate on failure too, so a stale screen picks up the latest state.
   revalidatePaymentSurfaces();
 
   if (!result.ok) {
     return back(paymentFailureCode(result.reason), billId);
   }
-    if (result.settled) {
+
+  if (result.settled) {
+    const table = tableText(result.bill);
+    const paidAt = paymentDateTime(new Date());
+
     notify({
       type: "PAYMENT_RECEIVED",
-      title: "Payment received",
-      message: `Bill paid${result.bill.paymentMethod ? ` via ${result.bill.paymentMethod}` : ""}: ₹${result.bill.totalRupees}.`,
+      title: table ? `Payment received — ${table}` : "Payment received",
+      message:
+        `${table ? `${table}: ` : ""}Bill paid` +
+        `${result.bill.paymentMethod ? ` via ${result.bill.paymentMethod}` : ""}: ` +
+        `₹${result.bill.totalRupees}. Paid on ${paidAt}.`,
       dedupeKey: `payment:${result.bill.id}`,
     });
   }
 
-  // Pots react only to a fully settled bill with real money behind it, and
-  // only once. The payment is already recorded, so a hook failure must not
-  // undo it.
   if (
     result.settled &&
     result.bill.paymentMethod !== null &&
     result.bill.totalRupees > 0
   ) {
     try {
-      onBillPaymentConfirmed(result.bill.id, result.bill.paymentMethod);
+      onBillPaymentConfirmed(
+        result.bill.id,
+        result.bill.paymentMethod,
+      );
     } catch (error) {
       console.error("Payment hook failed for bill", result.bill.id, error);
     }
@@ -160,41 +192,36 @@ export async function recordPaymentAction(formData: FormData): Promise<void> {
   return back(result.settled ? "paid" : "partial", result.bill.id);
 }
 
-/** Records a refund against one existing payment (owner only). */
-export async function refundPaymentAction(formData: FormData): Promise<void> {
-  if (!(await isOwner())) {
-    return back("forbidden");
-  }
+export async function refundPaymentAction(
+  formData: FormData,
+): Promise<void> {
+  if (!(await isOwner())) return back("forbidden");
 
   const paymentId = readText(formData, "paymentId");
-
-  if (paymentId === "") {
-    return back("invalid");
-  }
+  if (!paymentId) return back("invalid");
 
   const amount = readNumber(formData, "amountRupees");
+  if (amount === null) return back("refund-invalid-amount");
 
-  if (amount === null) {
-    return back("refund-invalid-amount");
-  }
-
-  const result = refundPayment(paymentId, amount, readText(formData, "reason"));
+  const reason = readText(formData, "reason");
+  const result = refundPayment(paymentId, amount, reason);
 
   revalidatePaymentSurfaces();
 
   if (!result.ok) {
     return back(refundFailureCode(result.reason));
   }
-    try {
+
+  try {
     onPaymentRefunded({
       refundId: result.refund.id,
       paymentId,
       amountRupees: amount,
-      reason: readText(formData, "reason"),
+      reason,
     });
   } catch (error) {
     console.error("Refund hook failed for payment", paymentId, error);
   }
-  
+
   return back("refunded", result.refund.billId);
 }

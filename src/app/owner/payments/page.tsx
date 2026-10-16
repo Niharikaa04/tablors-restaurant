@@ -1,10 +1,9 @@
+
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getDemoRole } from "@/server/modules/auth/session";
 import {
-  METHODS_REQUIRING_REFERENCE,
-  PAYMENT_METHODS,
   getBillPaymentSummary,
   getBills,
   getDailyCollection,
@@ -18,7 +17,6 @@ import {
   refundPaymentAction,
 } from "@/server/modules/payments/actions";
 
-// Payments live in server memory — never prerender.
 export const dynamic = "force-dynamic";
 
 type PageProps = {
@@ -30,50 +28,88 @@ type Notice = {
   text: string;
 };
 
-function getNotice(code: string | undefined): Notice | null {
+function getNotice(code?: string): Notice | null {
   switch (code) {
     case "paid":
-      return { tone: "success", text: "Payment recorded. The bill is fully paid." };
+      return {
+        tone: "success",
+        text: "Payment recorded. The bill is fully paid.",
+      };
     case "partial":
       return {
         tone: "success",
         text: "Part payment recorded. The table stays occupied until the balance is paid.",
       };
     case "refunded":
-      return { tone: "success", text: "Refund recorded against the original payment." };
+      return {
+        tone: "success",
+        text: "Refund recorded against the original payment.",
+      };
     case "already-paid":
-      return { tone: "error", text: "This bill is already fully paid. Nothing was recorded." };
-    case "overpayment":
-      return { tone: "error", text: "That amount is more than the remaining balance." };
-    case "invalid-amount":
-      return { tone: "error", text: "Enter a whole number of rupees, 1 or more." };
-    case "invalid-method":
-      return { tone: "error", text: "Choose Cash, UPI or Card. Online payment is not available yet." };
-    case "missing-reference":
-      return { tone: "error", text: "UPI and Card payments need a transaction ID." };
-    case "invalid-reference":
       return {
         tone: "error",
-        text: "Transaction ID must be 6–40 characters: letters, digits, - _ / .",
+        text: "This bill is already fully paid. Nothing was recorded.",
       };
-    case "duplicate-reference":
-      return { tone: "error", text: "That transaction ID has already been recorded." };
+    case "overpayment":
+      return {
+        tone: "error",
+        text: "That amount is more than the remaining balance.",
+      };
+    case "invalid-amount":
+      return {
+        tone: "error",
+        text: "Enter a whole number of rupees, 1 or more.",
+      };
+    case "invalid-method":
+      return {
+        tone: "error",
+        text: "Only cash payments are accepted.",
+      };
+    case "missing-reference":
+      return {
+        tone: "error",
+        text: "Cash payments do not require a transaction ID.",
+      };
     case "missing-bill":
-      return { tone: "error", text: "That bill no longer exists." };
+      return {
+        tone: "error",
+        text: "That bill no longer exists.",
+      };
     case "table-missing":
-      return { tone: "error", text: "That bill's order or table no longer exists." };
+      return {
+        tone: "error",
+        text: "That bill's order or table no longer exists.",
+      };
     case "missing-payment":
-      return { tone: "error", text: "That payment no longer exists." };
+      return {
+        tone: "error",
+        text: "That payment no longer exists.",
+      };
     case "refund-invalid-amount":
-      return { tone: "error", text: "Refund amount must be a whole number of rupees, 1 or more." };
+      return {
+        tone: "error",
+        text: "Refund amount must be a whole number of rupees, 1 or more.",
+      };
     case "refund-invalid-reason":
-      return { tone: "error", text: "Enter a refund reason of 3 to 200 characters." };
+      return {
+        tone: "error",
+        text: "Enter a refund reason of 3 to 200 characters.",
+      };
     case "refund-exceeds":
-      return { tone: "error", text: "Refund is more than what is still refundable on that payment." };
+      return {
+        tone: "error",
+        text: "Refund amount exceeds the refundable balance.",
+      };
     case "forbidden":
-      return { tone: "error", text: "Only the restaurant owner can record payments or refunds." };
+      return {
+        tone: "error",
+        text: "Only the restaurant owner can record payments or refunds.",
+      };
     case "invalid":
-      return { tone: "error", text: "That request was invalid." };
+      return {
+        tone: "error",
+        text: "That request was invalid.",
+      };
     default:
       return null;
   }
@@ -94,49 +130,60 @@ function formatDateTime(ms: number): string {
 }
 
 function methodLabel(method: string): string {
-  return method === "upi" ? "UPI" : method.charAt(0).toUpperCase() + method.slice(1);
+  if (method === "qr") return "qr";
+  if (method === "cash") return "Cash";
+  return method.charAt(0).toUpperCase() + method.slice(1);
 }
 
-function statusBadge(status: PaymentStatus): { label: string; className: string } {
+function statusBadge(status: PaymentStatus) {
   switch (status) {
     case "paid":
       return {
         label: "Paid",
-        className: "border-[var(--color-success)] text-[var(--color-success)]",
+        className:
+          "border-[var(--color-success)] text-[var(--color-success)]",
       };
     case "partial":
       return {
         label: "Partially paid",
-        className: "border-[var(--color-gold-500)] text-[var(--color-gold-500)]",
+        className:
+          "border-[var(--color-gold-500)] text-[var(--color-gold-500)]",
       };
     case "refunded":
       return {
         label: "Refunded",
-        className: "border-[var(--color-border)] text-[var(--color-text-muted)]",
+        className:
+          "border-[var(--color-border)] text-[var(--color-text-muted)]",
       };
     default:
       return {
         label: "Unpaid",
-        className: "border-[var(--color-warning)] text-[var(--color-warning)]",
+        className:
+          "border-[var(--color-warning)] text-[var(--color-warning)]",
       };
   }
 }
 
 const inputClass =
-  "mt-1 w-full rounded-[var(--radius-brand)] border border-[var(--color-border)] bg-[var(--color-surface-0)] px-3 py-1.5 text-[var(--color-text-primary)]";
+  "mt-1 w-full rounded-[var(--radius-brand)] border border-[var(--color-border)] bg-[var(--color-surface-0)] px-3 py-2 text-[var(--color-text-primary)]";
 
-export default async function PaymentsPage({ searchParams }: PageProps) {
+const buttonClass =
+  "rounded-[var(--radius-brand)] bg-[var(--color-gold-500)] px-4 py-2 text-xs font-medium text-[#0a0a0a] transition-opacity hover:opacity-90";
+
+export default async function PaymentsPage({
+  searchParams,
+}: PageProps) {
   const role = await getDemoRole();
 
   if (role !== "owner" && role !== "admin") {
     redirect("/login");
   }
 
-  // Only the owner may change anything; admin gets a read-only view.
   const canManage = role === "owner";
-
   const { notice, bill: noticeBillId } = await searchParams;
-  const noticeData = getNotice(typeof notice === "string" ? notice : undefined);
+  const noticeData = getNotice(
+    typeof notice === "string" ? notice : undefined,
+  );
 
   const tables = getTables();
   const bills = getBills();
@@ -149,13 +196,18 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
     return status === "unpaid" || status === "partial";
   });
 
+  const cashCollected = collection.byMethod.cash ?? 0;
+
   return (
-    <div>
-      <h1 className="text-2xl text-[var(--color-text-primary)]">Payments</h1>
+    <div className="space-y-2">
+      <h1 className="text-2xl text-[var(--color-text-primary)]">
+        Payments
+      </h1>
 
       {!canManage && (
         <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-          View only. Only the restaurant owner can record payments or refunds.
+          View only. Only the restaurant owner can record payments or
+          refunds.
         </p>
       )}
 
@@ -170,14 +222,15 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
           <p className="text-sm">{noticeData.text}</p>
 
           <div className="flex items-center gap-2">
-            {noticeBillId && bills.some((b) => b.id === noticeBillId) && (
-              <Link
-                href={`/owner/billing/${noticeBillId}`}
-                className="rounded-[var(--radius-brand)] border border-current px-3 py-1.5 text-xs font-medium"
-              >
-                View bill →
-              </Link>
-            )}
+            {noticeBillId &&
+              bills.some((bill) => bill.id === noticeBillId) && (
+                <Link
+                  href={`/owner/billing/${noticeBillId}`}
+                  className="rounded-[var(--radius-brand)] border border-current px-3 py-1.5 text-xs font-medium"
+                >
+                  View bill →
+                </Link>
+              )}
 
             <Link
               href="/owner/payments"
@@ -189,59 +242,56 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* ---------------- Daily collection ---------------- */}
-
+      {/* Daily collection */}
       <section className="mt-6">
         <h2 className="text-sm text-[var(--color-text-muted)]">
           Today&apos;s collection · {collection.dateKey}
         </h2>
 
-        <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-6">
-          <div className="col-span-2 rounded-[var(--radius-brand)] border border-[var(--color-gold-500)] bg-[var(--color-surface-1)] p-4">
-            <p className="text-xs text-[var(--color-text-muted)]">Net collected</p>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-[var(--radius-brand)] border border-[var(--color-gold-500)] bg-[var(--color-surface-1)] p-4">
+            <p className="text-xs text-[var(--color-text-muted)]">
+              Net collected
+            </p>
             <p className="mt-2 text-2xl text-[var(--color-text-primary)]">
               {formatRupees(collection.netRupees)}
             </p>
             <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              {collection.paymentCount} payment{collection.paymentCount === 1 ? "" : "s"}
-              {" · "}gross {formatRupees(collection.grossRupees)}
+              {collection.paymentCount} payment
+              {collection.paymentCount === 1 ? "" : "s"} · Gross{" "}
+              {formatRupees(collection.grossRupees)}
             </p>
           </div>
 
-          {PAYMENT_METHODS.map((method) => (
-            <div
-              key={method}
-              className="rounded-[var(--radius-brand)] border border-[var(--color-border)] bg-[var(--color-surface-1)] p-4"
-            >
-              <p className="text-xs text-[var(--color-text-muted)]">{methodLabel(method)}</p>
-              <p className="mt-2 text-lg text-[var(--color-text-primary)]">
-                {formatRupees(collection.byMethod[method])}
-              </p>
-            </div>
-          ))}
-
           <div className="rounded-[var(--radius-brand)] border border-[var(--color-border)] bg-[var(--color-surface-1)] p-4">
-            <p className="text-xs text-[var(--color-text-muted)]">Online</p>
-            <p className="mt-2 text-sm text-[var(--color-text-muted)]">Not connected yet</p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              Cash collected
+            </p>
+            <p className="mt-2 text-2xl text-[var(--color-text-primary)]">
+              {formatRupees(cashCollected)}
+            </p>
           </div>
         </div>
 
         <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-          Counts money actually recorded today. Unpaid balances are not included, part
-          payments count only what was paid, and refunds recorded today ({formatRupees(collection.refundedRupees)}) are
-          subtracted from the net figure.
+          Collection includes payments actually recorded today. Part
+          payments count only the amount paid. Refunds recorded today
+          ({formatRupees(collection.refundedRupees)}) are subtracted from
+          the net figure.
         </p>
       </section>
 
-      {/* ---------------- Outstanding bills ---------------- */}
-
+      {/* Outstanding bills */}
       <section className="mt-10">
-        <h2 className="text-sm text-[var(--color-text-muted)]">Outstanding bills</h2>
+        <h2 className="text-sm text-[var(--color-text-muted)]">
+          Outstanding bills
+        </h2>
 
         <div className="mt-3 space-y-4">
           {outstanding.length === 0 && (
             <p className="text-sm text-[var(--color-text-muted)]">
-              No unpaid bills. Generate a bill from Billing once an order is served.
+              No unpaid bills. Generate a bill from Billing once an order
+              is served.
             </p>
           )}
 
@@ -251,7 +301,9 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
             .map((bill) => {
               const summary = getBillPaymentSummary(bill);
               const badge = statusBadge(summary.status);
-              const table = tables.find((t) => t.id === bill.tableId);
+              const table = tables.find(
+                (item) => item.id === bill.tableId,
+              );
 
               return (
                 <div
@@ -278,19 +330,27 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
 
                   <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
                     <div>
-                      <p className="text-xs text-[var(--color-text-muted)]">Total</p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Total
+                      </p>
                       <p className="text-[var(--color-text-primary)]">
                         {formatRupees(summary.totalRupees)}
                       </p>
                     </div>
+
                     <div>
-                      <p className="text-xs text-[var(--color-text-muted)]">Paid</p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Paid
+                      </p>
                       <p className="text-[var(--color-text-primary)]">
                         {formatRupees(summary.paidRupees)}
                       </p>
                     </div>
+
                     <div>
-                      <p className="text-xs text-[var(--color-text-muted)]">Remaining</p>
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Remaining
+                      </p>
                       <p className="text-[var(--color-gold-500)]">
                         {formatRupees(summary.remainingRupees)}
                       </p>
@@ -298,63 +358,44 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                   </div>
 
                   {canManage && (
-                    <form action={recordPaymentAction} className="mt-4 space-y-3">
-                      <input type="hidden" name="billId" value={bill.id} />
+                    <form
+                      action={recordPaymentAction}
+                      className="mt-4 space-y-3"
+                    >
+                      <input
+                        type="hidden"
+                        name="billId"
+                        value={bill.id}
+                      />
 
-                      <div className="grid grid-cols-1 gap-3 text-xs text-[var(--color-text-secondary)] sm:grid-cols-2">
-                        <label className="block">
-                          Amount ₹ (whole rupees)
-                          <input
-                            type="number"
-                            name="amountRupees"
-                            defaultValue={summary.remainingRupees}
-                            min={bill.totalRupees === 0 ? 0 : 1}
-                            max={summary.remainingRupees}
-                            step={1}
-                            required
-                            className={inputClass}
-                          />
-                        </label>
+                      <label className="block text-xs text-[var(--color-text-secondary)]">
+                        Amount ₹ (whole rupees)
+                        <input
+                          type="number"
+                          name="amountRupees"
+                          defaultValue={summary.remainingRupees}
+                          min={1}
+                          max={summary.remainingRupees}
+                          step={1}
+                          required
+                          className={inputClass}
+                        />
+                      </label>
 
-                        <label className="block">
-                          Transaction ID ({METHODS_REQUIRING_REFERENCE.map(methodLabel).join(" / ")} required)
-                          <input
-                            type="text"
-                            name="transactionId"
-                            maxLength={40}
-                            autoComplete="off"
-                            placeholder="Optional for cash"
-                            className={inputClass}
-                          />
-                        </label>
-                      </div>
+                      <input
+                        type="hidden"
+                        name="method"
+                        value="cash"
+                      />
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        {PAYMENT_METHODS.map((method) => (
-                          <button
-                            key={method}
-                            type="submit"
-                            name="method"
-                            value={method}
-                            className="rounded-[var(--radius-brand)] bg-[var(--color-gold-500)] px-4 py-2 text-xs font-medium text-[#0a0a0a]"
-                          >
-                            Pay by {methodLabel(method)}
-                          </button>
-                        ))}
-
-                        <button
-                          type="button"
-                          disabled
-                          title="Online payment needs a payment gateway, which is not connected yet."
-                          className="cursor-not-allowed rounded-[var(--radius-brand)] border border-[var(--color-border)] px-4 py-2 text-xs font-medium text-[var(--color-text-muted)] opacity-60"
-                        >
-                          Online · Coming soon
-                        </button>
-                      </div>
+                      <button type="submit" className={buttonClass}>
+                        Pay by Cash
+                      </button>
 
                       <p className="text-xs text-[var(--color-text-muted)]">
-                        Enter less than the remaining amount for a part payment. The table is
-                        released only when the bill is fully paid.
+                        Enter less than the remaining amount for a part
+                        payment. The table is released only when the bill
+                        is fully paid.
                       </p>
                     </form>
                   )}
@@ -364,10 +405,11 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
         </div>
       </section>
 
-      {/* ---------------- Payment history ---------------- */}
-
+      {/* Payment history */}
       <section className="mt-10">
-        <h2 className="text-sm text-[var(--color-text-muted)]">Payment history</h2>
+        <h2 className="text-sm text-[var(--color-text-muted)]">
+          Payment history
+        </h2>
 
         <div className="mt-3 overflow-x-auto rounded-[var(--radius-brand)] border border-[var(--color-border)]">
           <table className="w-full text-sm">
@@ -389,7 +431,10 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
             <tbody>
               {payments.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-4 text-[var(--color-text-muted)]">
+                  <td
+                    colSpan={10}
+                    className="px-4 py-4 text-[var(--color-text-muted)]"
+                  >
                     No payments recorded yet.
                   </td>
                 </tr>
@@ -399,13 +444,25 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                 .slice()
                 .reverse()
                 .map((payment) => {
-                  const bill = bills.find((b) => b.id === payment.billId);
-                  const table = tables.find((t) => t.id === payment.tableId);
+                  const bill = bills.find(
+                    (item) => item.id === payment.billId,
+                  );
+                  const table = tables.find(
+                    (item) => item.id === payment.tableId,
+                  );
                   const refundedOnPayment = refunds
-                    .filter((r) => r.paymentId === payment.id)
-                    .reduce((sum, r) => sum + r.amountRupees, 0);
-                  const refundable = payment.amountRupees - refundedOnPayment;
-                  const badge = statusBadge(bill ? getBillPaymentSummary(bill).status : "unpaid");
+                    .filter((item) => item.paymentId === payment.id)
+                    .reduce(
+                      (sum, item) => sum + item.amountRupees,
+                      0,
+                    );
+                  const refundable =
+                    payment.amountRupees - refundedOnPayment;
+                  const badge = statusBadge(
+                    bill
+                      ? getBillPaymentSummary(bill).status
+                      : "unpaid",
+                  );
 
                   return (
                     <tr
@@ -439,7 +496,9 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                         {formatRupees(payment.amountRupees)}
                       </td>
                       <td className="px-4 py-3 text-[var(--color-text-secondary)]">
-                        {refundedOnPayment > 0 ? formatRupees(refundedOnPayment) : "—"}
+                        {refundedOnPayment > 0
+                          ? formatRupees(refundedOnPayment)
+                          : "—"}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -459,7 +518,11 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
                               action={refundPaymentAction}
                               className="mt-2 w-56 space-y-2 text-xs text-[var(--color-text-secondary)]"
                             >
-                              <input type="hidden" name="paymentId" value={payment.id} />
+                              <input
+                                type="hidden"
+                                name="paymentId"
+                                value={payment.id}
+                              />
 
                               <label className="block">
                                 Amount ₹ (max {formatRupees(refundable)})
@@ -505,10 +568,11 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
         </div>
       </section>
 
-      {/* ---------------- Refunds ---------------- */}
-
+      {/* Refund history */}
       <section className="mt-10">
-        <h2 className="text-sm text-[var(--color-text-muted)]">Refunds</h2>
+        <h2 className="text-sm text-[var(--color-text-muted)]">
+          Refunds
+        </h2>
 
         <div className="mt-3 overflow-x-auto rounded-[var(--radius-brand)] border border-[var(--color-border)]">
           <table className="w-full text-sm">
@@ -526,7 +590,10 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
             <tbody>
               {refunds.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-4 text-[var(--color-text-muted)]">
+                  <td
+                    colSpan={6}
+                    className="px-4 py-4 text-[var(--color-text-muted)]"
+                  >
                     No refunds recorded.
                   </td>
                 </tr>
@@ -565,8 +632,8 @@ export default async function PaymentsPage({ searchParams }: PageProps) {
         </div>
 
         <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-          A refund is recorded against the original payment, which is never edited or removed.
-          This records the refund only. It does not send money back through a gateway.
+          Refunds are recorded against the original payment. Recording a
+          refund here does not send money through a payment gateway.
         </p>
       </section>
     </div>

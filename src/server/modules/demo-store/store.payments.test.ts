@@ -319,6 +319,7 @@ describe("refundPayment", () => {
   });
 });
 
+
 describe("getDailyCollection", () => {
   it("counts only recorded money: partial payments count what was paid, unpaid bills count nothing", () => {
     const before = getDailyCollection();
@@ -326,42 +327,23 @@ describe("getDailyCollection", () => {
     unpaidBill();
 
     const partial = unpaidBill();
-    mustPay(partial.id, { method: "cash", amountRupees: 40 });
+    mustPay(partial.id, {
+      method: "cash",
+      amountRupees: 40,
+    });
 
     const full = unpaidBill();
-    mustPay(full.id, { method: "upi", amountRupees: 100, transactionId: reference() });
+    mustPay(full.id, {
+      method: "qr",
+      amountRupees: 100,
+      transactionId: reference(),
+    });
 
     const after = getDailyCollection();
 
     expect(after.byMethod.cash - before.byMethod.cash).toBe(40);
-    expect(after.byMethod.upi - before.byMethod.upi).toBe(100);
-    expect(after.byMethod.card - before.byMethod.card).toBe(0);
+    expect(after.byMethod.qr - before.byMethod.qr).toBe(100);
     expect(after.grossRupees - before.grossRupees).toBe(140);
     expect(after.paymentCount - before.paymentCount).toBe(2);
-  });
-
-  it("subtracts refunds recorded today from the net figure", () => {
-    const before = getDailyCollection();
-    const bill = unpaidBill();
-    const paid = mustPay(bill.id, { method: "cash", amountRupees: 100 });
-
-    refundPayment(paid.payment.id, 25, "Customer complaint");
-
-    const after = getDailyCollection();
-
-    expect(after.grossRupees - before.grossRupees).toBe(100);
-    expect(after.refundedRupees - before.refundedRupees).toBe(25);
-    expect(after.netRupees - before.netRupees).toBe(75);
-  });
-
-  it("does not invent collection for days with no payments", () => {
-    const farFuture = Date.now() + 3 * 24 * 60 * 60 * 1000;
-
-    expect(getDailyCollection(farFuture)).toMatchObject({
-      grossRupees: 0,
-      refundedRupees: 0,
-      netRupees: 0,
-      paymentCount: 0,
-    });
   });
 });

@@ -5,13 +5,10 @@ import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
  * DEMO staff data (in-memory). Every function takes restaurantId first and
  * filters by it, so one restaurant can never read or change another's staff.
  * restaurantId must always come from the server session, never the browser.
- *
- * NOTE: this lives in its own file because store.ts was not available when
- * this was written. It uses the same in-memory demo approach; merge it into
- * store.ts if you want a single store module.
  */
 
 export type StaffStatus = "active" | "inactive";
+export type LeaveType = "casual" | "sick" | "unpaid";
 
 export interface StaffMember {
   id: string;
@@ -20,6 +17,7 @@ export interface StaffMember {
   contact: string; // email or phone
   role: StaffRole;
   status: StaffStatus;
+  joinedOn: string | null; // yyyy-mm-dd
   createdAt: string;
   updatedAt: string;
   lastActiveAt: string | null;
@@ -30,9 +28,39 @@ export interface StaffInput {
   contact: string;
   role: StaffRole;
   status: StaffStatus;
+  joinedOn: string | null;
+}
+
+export interface Leave {
+  id: string;
+  restaurantId: string;
+  staffId: string;
+  type: LeaveType;
+  from: string; // yyyy-mm-dd, inclusive
+  to: string; // yyyy-mm-dd, inclusive
+  reason: string;
+  createdAt: string;
+}
+
+export interface LeaveInput {
+  staffId: string;
+  type: LeaveType;
+  from: string;
+  to: string;
+  reason: string;
 }
 
 const OTHER_RESTAURANT_ID = "demo-restaurant-b";
+
+/** Today's date (yyyy-mm-dd) in the restaurant's time zone. */
+export function todayInIndia(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
 
 function seed(): StaffMember[] {
   const now = Date.now();
@@ -53,6 +81,7 @@ function seed(): StaffMember[] {
     contact,
     role,
     status,
+    joinedOn: null, // not set until the owner fills it in
     createdAt: ago(createdHoursAgo),
     updatedAt: ago(createdHoursAgo),
     lastActiveAt: activeHoursAgo === null ? null : ago(activeHoursAgo),
@@ -70,9 +99,15 @@ function seed(): StaffMember[] {
 }
 
 // globalThis keeps the data across Next.js hot reloads in dev.
-const globalStore = globalThis as unknown as { __tablorsStaff?: StaffMember[] };
+const globalStore = globalThis as unknown as {
+  __tablorsStaff?: StaffMember[];
+  __tablorsLeaves?: Leave[];
+};
 function db(): StaffMember[] {
   return (globalStore.__tablorsStaff ??= seed());
+}
+function leaveDb(): Leave[] {
+  return (globalStore.__tablorsLeaves ??= []);
 }
 
 export function listStaff(restaurantId: string): StaffMember[] {
@@ -112,6 +147,7 @@ export function createStaff(restaurantId: string, input: StaffInput): StaffMembe
     contact: input.contact,
     role: input.role,
     status: input.status,
+    joinedOn: input.joinedOn,
     createdAt: now,
     updatedAt: now,
     lastActiveAt: null,
@@ -131,6 +167,7 @@ export function updateStaff(
   if (patch.contact !== undefined) found.contact = patch.contact;
   if (patch.role !== undefined) found.role = patch.role;
   if (patch.status !== undefined) found.status = patch.status;
+  if (patch.joinedOn !== undefined) found.joinedOn = patch.joinedOn;
   found.updatedAt = new Date().toISOString();
   return { ...found };
 }
@@ -138,6 +175,63 @@ export function updateStaff(
 export function deleteStaff(restaurantId: string, id: string): boolean {
   const list = db();
   const index = list.findIndex((m) => m.restaurantId === restaurantId && m.id === id);
+  if (index === -1) return false;
+  list.splice(index, 1);
+  // Their leave records go with them.
+  const leaves = leaveDb();
+  for (let i = leaves.length - 1; i >= 0; i -= 1) {
+    if (leaves[i].restaurantId === restaurantId && leaves[i].staffId === id) leaves.splice(i, 1);
+  }
+  return true;
+}
+
+/* ------------------------------ Leaves ------------------------------ */
+
+export function listLeaves(restaurantId: string): Leave[] {
+  return leaveDb()
+    .filter((l) => l.restaurantId === restaurantId)
+    .sort((a, b) => b.from.localeCompare(a.from))
+    .map((l) => ({ ...l }));
+}
+
+export function getLeave(restaurantId: string, id: string): Leave | undefined {
+  const found = leaveDb().find((l) => l.restaurantId === restaurantId && l.id === id);
+  return found ? { ...found } : undefined;
+}
+
+export function hasLeaveOverlap(
+  restaurantId: string,
+  staffId: string,
+  from: string,
+  to: string
+): boolean {
+  return leaveDb().some(
+    (l) =>
+      l.restaurantId === restaurantId &&
+      l.staffId === staffId &&
+      l.from <= to &&
+      from <= l.to
+  );
+}
+
+export function addLeave(restaurantId: string, input: LeaveInput): Leave {
+  const leave: Leave = {
+    id: `leave_${crypto.randomUUID()}`,
+    restaurantId,
+    staffId: input.staffId,
+    type: input.type,
+    from: input.from,
+    to: input.to,
+    reason: input.reason,
+    createdAt: new Date().toISOString(),
+  };
+  leaveDb().push(leave);
+  return { ...leave };
+}
+
+export function deleteLeave(restaurantId: string, id: string): boolean {
+  const list = leaveDb();
+  const index = list.findIndex((l) => l.restaurantId === restaurantId && l.id === id);
   if (index === -1) return false;
   list.splice(index, 1);
   return true;

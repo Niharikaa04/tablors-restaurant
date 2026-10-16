@@ -1,17 +1,50 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AutoRefresh } from "@/components/dashboard/auto-refresh";
+import { hasPermission } from "@/server/modules/auth/permissions";
+import { getDemoRole } from "@/server/modules/auth/session";
+import { formatAgo } from "@/server/modules/demo-store/device-telemetry";
 import {
-  getTables,
+  getDevices,
   getOrders,
-  type RestaurantTable,
+  getTables,
   type Order,
+  type RestaurantTable,
 } from "@/server/modules/demo-store/store";
-
+import { batteryTone } from "@/server/modules/demo-store/table-activity";
 import { removeTableAction } from "@/server/modules/tables/actions";
+import {
+  releaseTableAction,
+  renameTableAction,
+  reserveTableAction,
+} from "@/server/modules/tables/manage-actions";
 
 type PageProps = {
   params: Promise<{ tableId: string }>;
+  searchParams: Promise<{ notice?: string | string[] }>;
+};
+
+const NOTICES: Record<string, { tone: "ok" | "error"; text: string }> = {
+  renamed: { tone: "ok", text: "Table renamed." },
+  "rename-invalid": {
+    tone: "error",
+    text: "Enter a table name (up to 40 characters).",
+  },
+  "rename-duplicate": {
+    tone: "error",
+    text: "Another table already uses that name.",
+  },
+  reserved: { tone: "ok", text: "Table reserved." },
+  released: { tone: "ok", text: "Table is available again." },
+  "cannot-reserve": {
+    tone: "error",
+    text: "Only an available table with no active order can be reserved.",
+  },
+  "cannot-release": {
+    tone: "error",
+    text: "This table still has an active order or an unpaid bill.",
+  },
 };
 
 const statusStyles = {
@@ -37,6 +70,12 @@ const statusStyles = {
   },
 } as const;
 
+const BATTERY_TEXT = {
+  ok: "text-[var(--color-text-primary)]",
+  low: "text-[var(--color-warning)]",
+  critical: "text-[var(--color-danger)]",
+} as const;
+
 function getOrderTotal(order: Order | undefined): number {
   if (!order) {
     return 0;
@@ -48,8 +87,73 @@ function getOrderTotal(order: Order | undefined): number {
   );
 }
 
-export default async function TableDetailsPage({ params }: PageProps) {
+const HEADER_BUTTON =
+  "rounded-[var(--radius-brand)] border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-radium-700)] hover:text-[var(--color-radium-500)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--color-border)] disabled:hover:text-[var(--color-text-primary)]";
+const ROW_BUTTON =
+  "flex w-full items-center justify-between rounded-[var(--radius-brand)] border border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-primary)] transition hover:border-[var(--color-radium-700)] hover:text-[var(--color-radium-500)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--color-border)] disabled:hover:text-[var(--color-text-primary)]";
+
+/** Opens the full reservation form (name, phone, party size, time) for this table. */
+function ReserveLink({
+  tableId,
+  variant,
+}: {
+  tableId: string;
+  variant: "header" | "row";
+}) {
+  return (
+    <Link
+      href={`/owner/tables?reserve=${tableId}#reservations`}
+      className={variant === "header" ? HEADER_BUTTON : ROW_BUTTON}
+    >
+      <span>Reserve table</span>
+      {variant === "row" && <span aria-hidden="true">→</span>}
+    </Link>
+  );
+}
+
+/** Mark available, as a real form so it works without client JS. */
+function HoldForm({
+  tableId,
+  action,
+  label,
+  disabledReason,
+  variant,
+}: {
+  tableId: string;
+  action: (formData: FormData) => Promise<void>;
+  label: string;
+  disabledReason: string | null;
+  variant: "header" | "row";
+}) {
+  return (
+    <form action={action}>
+      <input type="hidden" name="tableId" value={tableId} />
+
+      <button
+        type="submit"
+        disabled={disabledReason !== null}
+        title={disabledReason ?? undefined}
+        className={variant === "header" ? HEADER_BUTTON : ROW_BUTTON}
+      >
+        <span>{label}</span>
+
+        {variant === "row" && <span aria-hidden="true">→</span>}
+      </button>
+    </form>
+  );
+}
+
+export default async function TableDetailsPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { tableId } = await params;
+  const { notice: rawNotice } = await searchParams;
+
+  const noticeCode = Array.isArray(rawNotice) ? rawNotice[0] : rawNotice;
+  const notice = noticeCode ? NOTICES[noticeCode] : undefined;
+
+  const canSeeDevices = hasPermission(await getDemoRole(), "devices");
 
   const tables = getTables();
   const orders = getOrders();
@@ -61,6 +165,9 @@ export default async function TableDetailsPage({ params }: PageProps) {
   if (!table) {
     notFound();
   }
+
+  const device = getDevices().find((d) => d.tableId === table.id) ?? null;
+  const hasBattery = device !== null && Number.isFinite(device.batteryPercent);
 
   const order = table.currentOrderId
     ? orders.find(
@@ -84,8 +191,44 @@ export default async function TableDetailsPage({ params }: PageProps) {
         ? "Occupied"
         : "Reserved";
 
+  // An available table with no order is reserved through the full form
+  // (guest name, phone, party size, time). Anything else uses "Mark available".
+  const useReserveForm = table.status === "available" && !hasActiveOrder;
+
+  const hold = {
+    action: releaseTableAction,
+    label: "Mark available",
+    disabledReason: hasActiveOrder
+      ? "In use: this table has an active order"
+      : null,
+  };
+
+  // Only used when the table is available but has an order (can't be reserved).
+  const blockedReserve = {
+    action: reserveTableAction,
+    label: "Reserve table",
+    disabledReason: "This table has an active order",
+  };
+
+  const headerHold = table.status === "available" ? blockedReserve : hold;
+
   return (
     <div className="space-y-8">
+      <AutoRefresh intervalMs={3000} />
+
+      {notice && (
+        <div
+          role="status"
+          className={`rounded-[var(--radius-brand)] border px-4 py-3 text-sm ${
+            notice.tone === "ok"
+              ? "border-[var(--color-radium-700)] bg-[var(--color-radium-500)]/5 text-[var(--color-radium-500)]"
+              : "border-[var(--color-danger)] bg-[var(--color-danger)]/5 text-[var(--color-danger)]"
+          }`}
+        >
+          {notice.text}
+        </div>
+      )}
+
       {/* ================================================================
           HEADER
       ================================================================= */}
@@ -97,7 +240,7 @@ export default async function TableDetailsPage({ params }: PageProps) {
             className="inline-flex items-center gap-2 text-sm text-[var(--color-text-muted)] transition hover:text-[var(--color-text-primary)]"
           >
             <span aria-hidden="true">←</span>
-            Back to tables
+            Back to Tables &amp; Devices
           </Link>
 
           <div className="mt-6 flex items-center gap-3">
@@ -116,19 +259,21 @@ export default async function TableDetailsPage({ params }: PageProps) {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            className="rounded-[var(--radius-brand)] border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-text-muted)]"
-          >
+          <a href="#rename-table" className={HEADER_BUTTON}>
             Rename
-          </button>
+          </a>
 
-          <button
-            type="button"
-            className="rounded-[var(--radius-brand)] border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-text-muted)]"
-          >
-            {table.status === "reserved" ? "Mark available" : "Reserve table"}
-          </button>
+          {useReserveForm ? (
+            <ReserveLink tableId={table.id} variant="header" />
+          ) : (
+            <HoldForm
+              tableId={table.id}
+              action={headerHold.action}
+              label={headerHold.label}
+              disabledReason={headerHold.disabledReason}
+              variant="header"
+            />
+          )}
         </div>
       </div>
 
@@ -300,71 +445,123 @@ export default async function TableDetailsPage({ params }: PageProps) {
                 <span aria-hidden="true">→</span>
               </Link>
 
-              <button
-                type="button"
-                className="flex w-full items-center justify-between rounded-[var(--radius-brand)] border border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-primary)] transition hover:border-[var(--color-text-muted)]"
-              >
-                <span>Rename table</span>
+              {useReserveForm ? (
+                <ReserveLink tableId={table.id} variant="row" />
+              ) : (
+                <HoldForm
+                  tableId={table.id}
+                  action={headerHold.action}
+                  label={headerHold.label}
+                  disabledReason={headerHold.disabledReason}
+                  variant="row"
+                />
+              )}
 
-                <span aria-hidden="true">→</span>
-              </button>
-
-              <button
-                type="button"
-                className="flex w-full items-center justify-between rounded-[var(--radius-brand)] border border-[var(--color-border)] px-4 py-3 text-sm text-[var(--color-text-primary)] transition hover:border-[var(--color-text-muted)]"
-              >
-                <span>
-                  {table.status === "reserved"
-                    ? "Mark table available"
-                    : "Reserve table"}
-                </span>
-
-                <span aria-hidden="true">→</span>
-              </button>
+              {!useReserveForm && headerHold.disabledReason && (
+                <p className="px-1 text-xs text-[var(--color-text-muted)]">
+                  {headerHold.disabledReason}.
+                </p>
+              )}
             </div>
+
+            {/* Rename */}
+
+            <form
+              action={renameTableAction}
+              className="mt-5 space-y-3 border-t border-[var(--color-border)] pt-5"
+            >
+              <input type="hidden" name="tableId" value={table.id} />
+
+              <label
+                htmlFor="rename-table"
+                className="block text-xs font-medium text-[var(--color-text-secondary)]"
+              >
+                Rename table
+              </label>
+
+              <input
+                id="rename-table"
+                name="label"
+                type="text"
+                required
+                maxLength={40}
+                defaultValue={table.label}
+                className="h-11 w-full rounded-[var(--radius-brand)] border border-zinc-700 bg-black px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-[#d7fe3b]"
+              />
+
+              <button
+                type="submit"
+                className="flex h-11 w-full items-center justify-center rounded-[var(--radius-brand)] px-4 text-sm font-medium text-black transition hover:brightness-110"
+                style={{ backgroundColor: "var(--color-radium-500,#d7fe3b)" }}
+              >
+                Save name
+              </button>
+            </form>
           </div>
 
-          {/* Device */}
+          {/* Device (real record; only for roles with the devices permission) */}
 
-          <div className="rounded-[var(--radius-brand)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
-                  Table device
-                </p>
+          {canSeeDevices && (
+            <div className="rounded-[var(--radius-brand)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
+                    Table device
+                  </p>
 
-                <p className="mt-2 text-base font-medium text-[var(--color-text-primary)]">
-                  Tablor device
-                </p>
+                  <p className="mt-2 text-base font-medium text-[var(--color-text-primary)]">
+                    Tablor device
+                  </p>
+                </div>
+
+                {device && (
+                  <span
+                    className={`rounded-full border px-2.5 py-1 text-[11px] ${
+                      device.online
+                        ? "border-[var(--color-radium-700)] text-[var(--color-radium-500)]"
+                        : "border-[var(--color-border)] text-[var(--color-text-muted)]"
+                    }`}
+                  >
+                    {device.online ? "Online" : "Offline"}
+                  </span>
+                )}
               </div>
 
-              <span className="rounded-full border border-[var(--color-radium-700)] px-2.5 py-1 text-[11px] text-[var(--color-radium-500)]">
-                Connected
-              </span>
+              {device ? (
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-[var(--radius-brand)] border border-[var(--color-border)] p-3">
+                    <p className="text-[11px] text-[var(--color-text-muted)]">
+                      Battery
+                    </p>
+
+                    <p
+                      className={`mt-1 text-sm ${
+                        hasBattery
+                          ? BATTERY_TEXT[batteryTone(device.batteryPercent)]
+                          : "text-[var(--color-text-muted)]"
+                      }`}
+                    >
+                      {hasBattery ? `${device.batteryPercent}%` : "—"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-[var(--radius-brand)] border border-[var(--color-border)] p-3">
+                    <p className="text-[11px] text-[var(--color-text-muted)]">
+                      Last seen
+                    </p>
+
+                    <p className="mt-1 text-sm text-[var(--color-text-primary)]">
+                      {formatAgo(device.lastSeenMinutesAgo)}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-5 text-sm text-[var(--color-text-muted)]">
+                  No device linked to this table.
+                </p>
+              )}
             </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-[var(--radius-brand)] border border-[var(--color-border)] p-3">
-                <p className="text-[11px] text-[var(--color-text-muted)]">
-                  Table
-                </p>
-
-                <p className="mt-1 text-sm text-[var(--color-text-primary)]">
-                  {table.label}
-                </p>
-              </div>
-
-              <div className="rounded-[var(--radius-brand)] border border-[var(--color-border)] p-3">
-                <p className="text-[11px] text-[var(--color-text-muted)]">
-                  Status
-                </p>
-
-                <p className="mt-1 text-sm text-[var(--color-radium-500)]">
-                  Online
-                </p>
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Remove */}
 
@@ -394,11 +591,11 @@ export default async function TableDetailsPage({ params }: PageProps) {
 
                 <form
                   action={removeTableAction}
-                  className="mt-3 space-y-3 rounded-[var(--radius-brand)] border border-[var(--color-danger)]/40 bg-[var(--color-bg)] p-4"
+                  className="mt-3 space-y-3 rounded-[var(--radius-brand)] border border-[var(--color-danger)]/40 bg-black p-4"
                 >
                   <input type="hidden" name="tableId" value={table.id} />
 
-                  <p className="text-sm leading-6 text-[var(--color-text-primary)]">
+                  <p className="text-sm leading-6 text-zinc-100">
                     Remove {table.label}? This can&apos;t be undone.
                   </p>
 

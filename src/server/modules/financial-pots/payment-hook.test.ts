@@ -45,7 +45,7 @@ describe("payment hook -> pots ledger (sandbox)", () => {
 
   it("split payments: each store payment is its own ledger payment; other bills are ignored", () => {
     store.payments.push({ id: "p1", billId: "b1", amountRupees: 40 }, { id: "p2", billId: "b1", amountRupees: 60 }, { id: "p9", billId: "other", amountRupees: 500 });
-    onBillPaymentConfirmed("b1", "upi");
+    onBillPaymentConfirmed("b1", "qr");
     const rt = getPotsRuntime();
     expect(rt.ledger.merchantFunds(B)).toBe(10000);
     expect(rt.payments.getPayment("p1")?.status).toBe("SUCCESS");

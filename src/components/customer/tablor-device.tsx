@@ -23,6 +23,7 @@ import {
 } from "@/server/modules/customer/actions";
 
 const MAX_QTY = 99;
+const MAX_CODE_LEN = 4;
 const MENU_REFRESH_MS = 10_000;
 const PAYMENT_REFRESH_MS = 3_000;
 
@@ -41,8 +42,18 @@ export function TablorDevice({
   const router = useRouter();
   const pathname = usePathname();
 
+  /*
+   * Item selection works like the real device:
+   *  1. Type the item code on the keypad (codeDraft)
+   *  2. Press ✓  -> the item is selected (selectedCode)
+   *  3. Type the quantity (or use + / -)
+   *  4. Press ✓  -> the item is added to the order
+   */
+  const [codeDraft, setCodeDraft] = useState("");
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [qtyDraft, setQtyDraft] = useState(0);
+  const [qtyTyped, setQtyTyped] = useState(false);
+
   const [confirmSubmitting, setConfirmSubmitting] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
@@ -144,40 +155,83 @@ export function TablorDevice({
     return () => clearTimeout(timeout);
   }, [infoMessage]);
 
-  function handleSelectItem(item: MenuItem) {
-    setSelectedCode(item.code);
-    setQtyDraft(cart.getQty(item.code) || 1);
-    setConfirmError(null);
-  }
-
+  /*
+   * Number keys:
+   *  - no item selected yet -> build the item code
+   *  - item selected        -> build the quantity
+   */
   function handleDigit(digit: string) {
     if (!selectedItem) {
+      setConfirmError(null);
+      setCodeDraft((prev) =>
+        prev.length >= MAX_CODE_LEN ? prev : prev + digit
+      );
       return;
     }
 
     setQtyDraft((prev) => {
+      // The first digit typed replaces the default quantity.
+      if (!qtyTyped) {
+        return Number(digit);
+      }
+
       const next = Number(`${prev === 0 ? "" : prev}${digit}`);
 
       return Number.isFinite(next) ? Math.min(next, MAX_QTY) : prev;
     });
+
+    setQtyTyped(true);
   }
 
+  /*
+   * X key: delete the last code digit, or the last quantity digit.
+   */
   function handleBackspace() {
     if (!selectedItem) {
+      setCodeDraft((prev) => prev.slice(0, -1));
       return;
     }
 
     setQtyDraft((prev) => Math.floor(prev / 10));
+    setQtyTyped(true);
   }
 
+  /*
+   * ✓ key:
+   *  - no item selected -> look up the typed item code and select it
+   *  - item selected    -> add the item with the chosen quantity
+   */
   function handleCommitQty() {
     if (!selectedItem) {
+      const code = codeDraft.trim();
+
+      if (!code) {
+        setInfoMessage("Enter an item code first, then press ✓.");
+        return;
+      }
+
+      const match =
+        items.find((item) => item.code === code) ??
+        items.find((item) => item.code === code.padStart(3, "0"));
+
+      if (!match) {
+        setInfoMessage(`No item found with code ${code}.`);
+        setCodeDraft("");
+        return;
+      }
+
+      setSelectedCode(match.code);
+      setQtyDraft(cart.getQty(match.code) || 1);
+      setQtyTyped(false);
+      setCodeDraft("");
+      setConfirmError(null);
       return;
     }
 
     cart.setQty(selectedItem, qtyDraft);
     setSelectedCode(null);
     setQtyDraft(0);
+    setQtyTyped(false);
   }
 
   function handleQtyPlus() {
@@ -198,8 +252,10 @@ export function TablorDevice({
 
   function handleClearAll() {
     cart.clearCart();
+    setCodeDraft("");
     setSelectedCode(null);
     setQtyDraft(0);
+    setQtyTyped(false);
   }
 
   async function handleConfirmOrder() {
@@ -223,8 +279,10 @@ export function TablorDevice({
 
     if (result.ok) {
       cart.clearCart();
+      setCodeDraft("");
       setSelectedCode(null);
       setQtyDraft(0);
+      setQtyTyped(false);
       setBill(null);
       setLastOrderId(result.orderId);
 
@@ -371,10 +429,16 @@ export function TablorDevice({
         </span>
       </div>
 
+      {/*
+        Items are chosen by typing their code on the keypad,
+        so tapping a menu row does nothing.
+        To allow tapping again, pass a handler that sets
+        selectedCode / qtyDraft here instead of the empty function.
+      */}
       <MenuPane
         items={items}
         selectedCode={selectedCode}
-        onSelectItem={handleSelectItem}
+        onSelectItem={() => {}}
         getQty={cart.getQty}
       />
 
@@ -431,6 +495,7 @@ export function TablorDevice({
       <div className="mt-2 grid grid-cols-1 gap-2 lg:grid-cols-2">
         <KeypadPanel
           selectedItemName={selectedItem?.name ?? null}
+          codeDraft={codeDraft}
           qtyDraft={qtyDraft}
           onDigit={handleDigit}
           onBackspace={handleBackspace}

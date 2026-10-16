@@ -3,8 +3,8 @@ import { StaggerGroup, StaggerItem } from "./motion/stagger";
 
 const highlights = [
   {
-    title: "One device per table",
-    body: "A book-shaped ordering device sits on every table. Guests browse the menu by page and order by item number — no app to install, no waiter to flag down.",
+    title: "A device that takes the order",
+    body: "Customers select items on the countertop ordering terminal using its numeric keypad and order buttons, and see the order on the built-in display.",
   },
   {
     title: "One dashboard for the owner",

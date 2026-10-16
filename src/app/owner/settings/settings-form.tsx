@@ -60,7 +60,7 @@ export function SettingsForm({ initial }: { initial: RestaurantSettings }) {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-zinc-50">Restaurant Settings</h1>
-        <p className="mt-1 text-sm text-zinc-400">Business details, tax, printers, kitchen and payments.</p>
+        <p className="mt-1 text-sm text-zinc-400">Business details, tax, printers and kitchen.</p>
       </div>
 
       <Section title="Restaurant profile">
@@ -113,13 +113,6 @@ export function SettingsForm({ initial }: { initial: RestaurantSettings }) {
         <Toggle label="Auto-accept new orders" checked={s.kitchen.autoAcceptOrders} onChange={(v) => set("kitchen", { ...s.kitchen, autoAcceptOrders: v })} />
         <Toggle label="Sound alerts for new orders" checked={s.kitchen.soundAlerts} onChange={(v) => set("kitchen", { ...s.kitchen, soundAlerts: v })} />
         <Field label="Default prep time (minutes)"><input type="number" min={1} max={180} className={input} value={s.kitchen.defaultPrepMinutes} onChange={(e) => set("kitchen", { ...s.kitchen, defaultPrepMinutes: Number(e.target.value) })} /></Field>
-      </Section>
-
-      <Section title="Payment settings">
-        <Toggle label="Cash" checked={s.payment.cash} onChange={(v) => set("payment", { ...s.payment, cash: v })} />
-        <Toggle label="UPI" checked={s.payment.upi} onChange={(v) => set("payment", { ...s.payment, upi: v })} />
-        <Toggle label="Card" checked={s.payment.card} onChange={(v) => set("payment", { ...s.payment, card: v })} />
-        <Field label="UPI ID"><input className={input} placeholder="restaurant@bank" value={s.payment.upiId} onChange={(e) => set("payment", { ...s.payment, upiId: e.target.value })} /></Field>
       </Section>
 
       {msg && (

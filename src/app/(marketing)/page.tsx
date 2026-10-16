@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Tablor's — Smart Table Ordering for Restaurants",
     description:
-      "A book-shaped table ordering device, a kitchen display system, and an owner dashboard — in one connected platform.",
+      "A small ordering device on every table. Orders go straight to the kitchen, and you can see every table and bill in one place.",
     type: "website",
   },
 };

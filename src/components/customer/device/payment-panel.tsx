@@ -1,7 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import type { CustomerBillState } from "@/server/modules/customer/actions";
+
+/*
+ * DEMO MODE
+ * When no real restaurant UPI account is configured, a QR is built
+ * from this dummy UPI ID so the flow can be shown.
+ * Set DEMO_UPI_ENABLED to false once real UPI is configured.
+ */
+const DEMO_UPI_ENABLED = true;
+const DEMO_UPI_ID = "demo@upi";
+const DEMO_PAYEE = "Demo Restaurant";
 
 function rupees(value: number): string {
   return `₹${value.toLocaleString("en-IN")}`;
@@ -13,8 +23,10 @@ export function PaymentPanel({
   onClose,
   onGenerateBill,
   generatingBill,
-  onConfirmUpi,
-  confirmingUpi,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onConfirmUpi: _onConfirmUpi,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  confirmingUpi: _confirmingUpi,
 }: {
   bill: CustomerBillState | null;
   mode?: "bill" | "qr";
@@ -24,8 +36,6 @@ export function PaymentPanel({
   onConfirmUpi?: (transactionId: string) => void;
   confirmingUpi?: boolean;
 }) {
-  const [transactionId, setTransactionId] = useState("");
-
   /*
    * No bill generated yet.
    */
@@ -87,8 +97,24 @@ export function PaymentPanel({
   const partial = bill.status === "partial";
   const hasBalance = bill.remainingRupees > 0;
 
-  const upiAddress =
-    bill.upiUri?.match(/(?:^|[?&])pa=([^&]+)/)?.[1] ?? null;
+  /*
+   * Real UPI link from the server, or a demo link built here.
+   */
+  const demoUpiUri =
+    DEMO_UPI_ENABLED && !bill.upiUri
+      ? `upi://pay?${new URLSearchParams({
+          pa: DEMO_UPI_ID,
+          pn: DEMO_PAYEE,
+          am: bill.remainingRupees.toFixed(2),
+          cu: "INR",
+          tn: `Bill ${bill.billId}`,
+          tr: String(bill.billId),
+        }).toString()}`
+      : null;
+
+  const upiUri = bill.upiUri ?? demoUpiUri;
+  const upiAddressRaw = upiUri?.match(/(?:^|[?&])pa=([^&]+)/)?.[1] ?? null;
+  const upiAddress = upiAddressRaw ? decodeURIComponent(upiAddressRaw) : null;
 
   /*
    * ============================================================
@@ -343,7 +369,7 @@ export function PaymentPanel({
               Thank you for dining with us.
             </p>
           </div>
-        ) : !bill.upiConfigured ? (
+        ) : !bill.upiConfigured && !DEMO_UPI_ENABLED ? (
           <div
             className="mt-5 rounded-lg border p-4 text-center"
             style={{
@@ -418,6 +444,10 @@ export function PaymentPanel({
                     className="h-full w-full object-contain"
                   />
                 </div>
+              ) : upiUri ? (
+                <div className="mx-auto mt-4 flex h-60 w-60 items-center justify-center rounded-xl bg-white p-3">
+                  <QRCodeSVG value={upiUri} size={216} level="M" />
+                </div>
               ) : (
                 <div
                   className="mx-auto mt-4 flex h-60 w-60 items-center justify-center rounded-xl border text-center"
@@ -456,9 +486,9 @@ export function PaymentPanel({
             </div>
 
             {/* Open UPI app */}
-            {bill.upiUri && (
+            {upiUri && (
               <a
-                href={bill.upiUri}
+                href={upiUri}
                 className="mt-3 block rounded-md py-3 text-center text-sm font-semibold"
                 style={{
                   background: "var(--device-gold)",
@@ -468,67 +498,6 @@ export function PaymentPanel({
                 Open UPI App
               </a>
             )}
-
-            {/* UTR */}
-            <div className="mt-4">
-              <label
-                htmlFor="customer-upi-reference"
-                className="text-xs"
-                style={{ color: "var(--device-lcd-muted)" }}
-              >
-                UTR / Transaction ID
-              </label>
-
-              <input
-                id="customer-upi-reference"
-                value={transactionId}
-                onChange={(event) =>
-                  setTransactionId(event.target.value)
-                }
-                placeholder="Enter UTR / transaction reference"
-                autoComplete="off"
-                inputMode="text"
-                maxLength={40}
-                className="mt-1 w-full rounded-md border bg-transparent px-3 py-3 text-sm outline-none"
-                style={{
-                  borderColor: "var(--device-shell-border)",
-                  color: "var(--device-lcd-text)",
-                }}
-              />
-
-              <p
-                className="mt-1 text-[10px]"
-                style={{ color: "var(--device-lcd-muted)" }}
-              >
-                6–40 characters: letters, numbers, -, _, / or .
-              </p>
-            </div>
-
-            {/* Confirm */}
-            <button
-              type="button"
-              onClick={() => onConfirmUpi?.(transactionId.trim())}
-              disabled={
-                confirmingUpi || transactionId.trim().length < 6
-              }
-              className="mt-3 w-full rounded-md py-3 text-sm font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-              style={{
-                background: "var(--device-gold)",
-                color: "#171a10",
-              }}
-            >
-              {confirmingUpi
-                ? "Confirming Payment…"
-                : "I Paid — Confirm UPI Payment"}
-            </button>
-
-            <p
-              className="mt-3 text-center text-[11px]"
-              style={{ color: "var(--device-lcd-muted)" }}
-            >
-              Enter the transaction reference only after completing
-              the payment in your UPI app.
-            </p>
           </>
         )}
       </div>

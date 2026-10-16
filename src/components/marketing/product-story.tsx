@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Reveal } from "./motion/reveal";
-import { BookDeviceIllustration } from "./book-device-illustration";
+import { TablorDeviceImage } from "./tablor-device-image";
 import {
   SAMPLE_GST_PERCENT,
   sampleLines,
@@ -18,57 +18,26 @@ import {
 export { SAMPLE_GST_PERCENT, sampleLines, sampleItems, sampleSubtotal, sampleGst, sampleTotal, beats };
 
 /**
- * The product story, rebuilt as a controlled editorial sequence rather
- * than a single pinned-scroll "film."
+ * The product story: a controlled editorial sequence (no pinned scroll).
  *
  * Six steps, one continuous visual language:
- *   01 The table   — the closed device, at rest (reuses BookDeviceIllustration)
- *   02 Menu & select — the open device, browsing + building an order
- *   03 Confirm & send — the same open device, order confirmed
- *   04 Kitchen     — the real kitchen-display layout (New/Preparing/Ready)
- *   05 Owner       — the real owner-dashboard stat cards
- *   06 Bill & pay  — the open device again, showing the payment QR
+ *   01 The table   — the countertop ordering terminal (client photo)
+ *   02 Menu & select — the terminal's order display, building an order
+ *   03 Confirm & send — the same order display, order confirmed
+ *   04 Kitchen     — the kitchen-display layout (New/Preparing/Ready)
+ *   05 Owner       — the owner-dashboard stat cards
+ *   06 Bill & pay  — the bill summary
  *
  * Every step is a normal-flow two-column row (visual left, copy right on
- * desktop; visual above copy on mobile) — nothing is pinned, nothing
- * scrubs a shared "stage" value, and the device is never scaled or
- * squashed into a side-on sliver. `Reveal` only fades/lifts each half in
- * as it enters the viewport, so with `prefers-reduced-motion` the whole
- * sequence is simply readable top-to-bottom with no motion at all — the
- * table → menu → select → confirm → kitchen → owner → billing
- * progression is carried entirely by layout and copy, not by animation.
+ * desktop; visual above copy on mobile). `Reveal` only fades/lifts each
+ * half in, so with `prefers-reduced-motion` the sequence is simply readable
+ * top-to-bottom.
  *
- * Seven `beats` of real product copy (product-story-data.ts) are kept
- * and merged into six steps: the "menu" and "selection" beats become one
- * "Menu & select" step, with the selection copy demoted to a short
- * supporting line — matching the requested 01→06 structure without
- * inventing new copy.
+ * Only the terminal's keypad, order buttons, built-in LCD order display and
+ * handset are established by the client's reference. The order-display
+ * panels below are illustrations of that LCD; they do not claim extra
+ * device functions (no QR, menu pages or bill printing on the device).
  */
-
-type PageRow = { code: string; name: string };
-
-const menuPages: { tag: string; title: string; rows: PageRow[] }[] = [
-  {
-    tag: "PAGE 4",
-    title: "CHICKEN",
-    rows: [
-      { code: "008", name: "Chicken 65" },
-      { code: "060", name: "Butter Chicken" },
-      { code: "099", name: "Pepper Chicken" },
-      { code: "082", name: "Chilli Chicken" },
-    ],
-  },
-  {
-    tag: "PAGE 7",
-    title: "BIRYANIS & RICE",
-    rows: [
-      { code: "055", name: "Veg Biryani" },
-      { code: "111", name: "Chicken Biryani" },
-      { code: "116", name: "Jeera Rice" },
-      { code: "118", name: "Curd Rice" },
-    ],
-  },
-];
 
 type Step = {
   anchorId?: string;
@@ -84,10 +53,10 @@ const steps: Step[] = [
   {
     anchorId: "device",
     number: "01",
-    label: "THE TABLE",
-    heading: beats[0].title,
-    body: beats[0].body,
-    visual: <ClosedDeviceVisual />,
+    label: "THE TERMINAL",
+    heading: "A terminal on the counter",
+    body: "Customers select items using the numeric keypad and order buttons, and see their order on the built-in display.",
+    visual: <DeviceImageVisual />,
   },
   {
     anchorId: "ordering",
@@ -96,14 +65,14 @@ const steps: Step[] = [
     heading: beats[1].title,
     body: beats[1].body,
     meta: beats[2].body,
-    visual: <OpenDeviceVisual lcd="building" />,
+    visual: <OrderDisplayVisual state="building" />,
   },
   {
     number: "03",
     label: "CONFIRM & SEND",
     heading: beats[3].title,
     body: beats[3].body,
-    visual: <OpenDeviceVisual lcd="confirmed" />,
+    visual: <OrderDisplayVisual state="confirmed" />,
   },
   {
     number: "04",
@@ -124,7 +93,7 @@ const steps: Step[] = [
     label: "BILL & PAY",
     heading: beats[6].title,
     body: beats[6].body,
-    visual: <OpenDeviceVisual lcd="billing" />,
+    visual: <BillVisual />,
   },
 ];
 
@@ -132,7 +101,7 @@ export function ProductStory() {
   return (
     <section
       id="story"
-      aria-label="How an order moves from the table, through the device, the kitchen and the owner's dashboard, to the final bill"
+      aria-label="How an order moves from the table, through the terminal, the kitchen and the owner's dashboard, to the final bill"
       className="snap-section relative bg-[var(--mkt-stage)] px-6 py-16 sm:py-20 lg:py-24"
     >
       <div id="product" aria-hidden="true" className="absolute top-0" style={{ scrollMarginTop: "4.25rem" }} />
@@ -159,8 +128,8 @@ export function ProductStory() {
   );
 }
 const flow = [
-  { n: "01", title: "Customer", text: "Picks dishes on the table device" },
-  { n: "02", title: "Order", text: "One tap sends it instantly" },
+  { n: "01", title: "Customer", text: "Selects items on the countertop device" },
+  { n: "02", title: "Order", text: "Sent straight to the kitchen" },
   { n: "03", title: "Kitchen", text: "Sees it on screen and prepares it" },
   { n: "04", title: "Owner", text: "Sees every table, order and bill" },
 ];
@@ -228,93 +197,43 @@ function StoryStep({ step, first }: { step: Step; first: boolean }) {
 }
 
 /* ---------------------------------------------------------------- */
-/* Step 01 visual — the closed device, at rest                       */
+/* Step 01 visual — the countertop terminal (client photo)           */
 /* ---------------------------------------------------------------- */
 
-function ClosedDeviceVisual() {
+function DeviceImageVisual() {
   return (
-    <div className="mx-auto w-48 sm:w-56 lg:w-64">
-      <BookDeviceIllustration className="w-full drop-shadow-[0_30px_60px_rgba(0,0,0,0.6)]" />
+    <div className="mx-auto w-full">
+      <TablorDeviceImage
+        sizes="(min-width: 1024px) 28rem, 92vw"
+        className="drop-shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
+      />
     </div>
   );
 }
 
 /* ---------------------------------------------------------------- */
-/* Steps 02 / 03 / 06 visual — the open device, real menu + keypad   */
-/* + order display, differing only in what the LCD shows.            */
+/* Steps 02 / 03 visual — the terminal's built-in order display      */
 /* ---------------------------------------------------------------- */
 
-function OpenDeviceVisual({ lcd }: { lcd: "building" | "confirmed" | "billing" }) {
+function OrderDisplayVisual({ state }: { state: "building" | "confirmed" }) {
   return (
     <div
       role="img"
-      aria-label="Illustration of the open Tablor's device with menu pages, a numeric keypad and an order display"
+      aria-label={
+        state === "building"
+          ? "Illustration of the terminal's order display listing the items in an order and the total"
+          : "Illustration of the terminal's order display showing the order confirmed and sent to the kitchen"
+      }
       className="tablor-device overflow-hidden rounded-2xl border-2 p-1.5 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] sm:p-2"
       style={{ borderColor: "var(--device-gold)", background: "var(--device-shell)" }}
     >
-      <div aria-hidden="true">
-        <div className="grid gap-1 sm:grid-cols-2">
-          {menuPages.map((page) => (
-            <div key={page.tag} className="rounded-lg px-2.5 pb-2 pt-2.5 sm:px-3" style={{ background: "#fdfcf8" }}>
-              <div className="flex items-center gap-2">
-                <span
-                  className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white"
-                  style={{ background: "var(--device-tag-red)" }}
-                >
-                  {page.tag}
-                </span>
-                <span className="text-[11px] font-extrabold tracking-wide" style={{ color: "var(--device-tag-red)" }}>
-                  {page.title}
-                </span>
-              </div>
-              <ul className="mt-1.5 space-y-1 border-t border-[#ddd] pt-1.5">
-                {page.rows.map((row) => (
-                  <li key={row.code} className="flex items-center gap-2">
-                    <span className="flex h-4 w-6 shrink-0 items-center justify-center rounded-sm bg-[#111] text-[9px] font-bold text-white">
-                      {row.code}
-                    </span>
-                    <span className="truncate text-[11px] font-semibold text-[#1b1b1b]">{row.name}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-1 grid gap-1 sm:grid-cols-2">
-          <div
-            className="hidden rounded-lg border px-3 py-3 sm:block"
-            style={{ borderColor: "var(--device-shell-border)", background: "#0b0c10" }}
-          >
-            <DeviceKeypad />
-          </div>
-
-          <div
-            className="min-h-[9.5rem] rounded-lg border px-3 py-2.5"
-            style={{ background: "var(--device-lcd-bg)", borderColor: "var(--device-lcd-border)" }}
-          >
-            {lcd === "building" && <DeviceLcdBuilding />}
-            {lcd === "confirmed" && <DeviceLcdConfirmed />}
-            {lcd === "billing" && <DeviceLcdBilling />}
-          </div>
-        </div>
+      <div
+        aria-hidden="true"
+        className="min-h-[12rem] rounded-lg border px-4 py-3.5"
+        style={{ background: "var(--device-lcd-bg)", borderColor: "var(--device-lcd-border)" }}
+      >
+        {state === "building" ? <DeviceLcdBuilding /> : <DeviceLcdConfirmed />}
       </div>
-    </div>
-  );
-}
-
-function DeviceKeypad() {
-  return (
-    <div className="grid grid-cols-3 gap-1">
-      {["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "✓"].map((key) => (
-        <div
-          key={key}
-          className="flex h-6 items-center justify-center rounded-md text-[10px] font-bold text-[#171a10]"
-          style={{ background: "linear-gradient(180deg, var(--device-gold-hover), var(--device-gold-soft))" }}
-        >
-          {key}
-        </div>
-      ))}
     </div>
   );
 }
@@ -322,10 +241,10 @@ function DeviceKeypad() {
 function LcdHeader() {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--device-lcd-cyan)" }}>
+      <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--device-lcd-cyan)" }}>
         Your Order
       </span>
-      <span className="text-[10px]" style={{ color: "var(--device-lcd-text)" }}>
+      <span className="text-[11px]" style={{ color: "var(--device-lcd-text)" }}>
         TABLE NO: 04
       </span>
     </div>
@@ -334,9 +253,9 @@ function LcdHeader() {
 
 function DeviceLcdBuilding() {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-[10.5rem] flex-col">
       <LcdHeader />
-      <table className="mt-1.5 w-full text-[10px]" style={{ color: "var(--device-lcd-text)" }}>
+      <table className="mt-2 w-full text-[11px]" style={{ color: "var(--device-lcd-text)" }}>
         <tbody>
           {sampleLines.map((line) => (
             <tr key={line.code}>
@@ -348,12 +267,12 @@ function DeviceLcdBuilding() {
         </tbody>
       </table>
       <div
-        className="mt-auto flex items-end justify-between border-t pt-1.5 text-[10px]"
+        className="mt-auto flex items-end justify-between border-t pt-2 text-[11px]"
         style={{ borderColor: "var(--device-lcd-cyan)", color: "var(--device-lcd-cyan)" }}
       >
         <span className="font-semibold">Items : {sampleItems}</span>
         <span className="text-right leading-tight">
-          <span className="block text-[9px]" style={{ color: "var(--device-lcd-muted)" }}>
+          <span className="block text-[10px]" style={{ color: "var(--device-lcd-muted)" }}>
             GST {SAMPLE_GST_PERCENT}% : {sampleGst}/-
           </span>
           <span className="font-semibold">Total : ₹ {sampleTotal}/-</span>
@@ -365,61 +284,25 @@ function DeviceLcdBuilding() {
 
 function DeviceLcdConfirmed() {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+    <div className="flex min-h-[10.5rem] flex-col items-center justify-center gap-2.5 text-center">
       <span
-        className="rounded-full px-3 py-1 text-[11px] font-semibold"
+        className="rounded-full px-3 py-1 text-xs font-semibold"
         style={{ background: "var(--mkt-lime)", color: "var(--mkt-lime-ink)" }}
       >
         Order confirmed ✓
       </span>
-      <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--device-lcd-muted)" }}>
+      <span className="text-[11px] uppercase tracking-widest" style={{ color: "var(--device-lcd-muted)" }}>
         Sent to kitchen
       </span>
-      <span className="text-[11px] font-semibold" style={{ color: "var(--device-lcd-text)" }}>
+      <span className="text-xs font-semibold" style={{ color: "var(--device-lcd-text)" }}>
         {sampleItems} items · Total ₹ {sampleTotal}/-
       </span>
     </div>
   );
 }
 
-function DeviceLcdBilling() {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-      <span className="text-[10px] uppercase tracking-widest" style={{ color: "var(--device-lcd-cyan)" }}>
-        Scan &amp; pay
-      </span>
-      <QrGlyph />
-      <span className="text-[11px] font-semibold" style={{ color: "var(--device-lcd-text)" }}>
-        Total ₹ {sampleTotal}/-
-      </span>
-      <span
-        className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-        style={{ background: "var(--mkt-lime)", color: "var(--mkt-lime-ink)" }}
-      >
-        Table 04 · Paid
-      </span>
-    </div>
-  );
-}
-
-function QrGlyph() {
-  // Decorative — a book-cipher of filled/empty cells, not a scannable
-  // code. It only needs to read as "a QR code" at a glance.
-  const cells = [
-    1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1,
-    1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1,
-  ];
-  return (
-    <div className="grid grid-cols-7 gap-[1.5px] rounded bg-white p-1.5">
-      {cells.map((cell, i) => (
-        <span key={i} className={`h-1 w-1 ${cell ? "bg-black" : "bg-white"}`} />
-      ))}
-    </div>
-  );
-}
-
 /* ---------------------------------------------------------------- */
-/* Step 04 visual — the real kitchen display (New/Preparing/Ready)   */
+/* Step 04 visual — the kitchen display (New/Preparing/Ready)        */
 /* ---------------------------------------------------------------- */
 
 function KitchenVisual() {
@@ -470,7 +353,7 @@ function KitchenVisual() {
 }
 
 /* ---------------------------------------------------------------- */
-/* Step 05 visual — the real owner dashboard stat cards               */
+/* Step 05 visual — the owner dashboard stat cards                    */
 /* ---------------------------------------------------------------- */
 
 function OwnerVisual() {
@@ -523,6 +406,64 @@ function OwnerVisual() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Step 06 visual — the bill summary (system view, not on the device) */
+/* ---------------------------------------------------------------- */
+
+function BillVisual() {
+  return (
+    <div className="rounded-2xl border p-4 sm:p-5" style={{ borderColor: "var(--color-border)", background: "var(--mkt-surface)" }}>
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] uppercase tracking-[0.25em]" style={{ color: "var(--color-radium-500)" }}>
+          Bill
+        </p>
+        <span className="text-xs" style={{ color: "var(--color-text-primary)" }}>
+          Table 04
+        </span>
+      </div>
+
+      <ul
+        className="mt-4 space-y-1.5 border-t pt-3 text-xs"
+        style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+      >
+        {sampleLines.map((line) => (
+          <li key={line.code} className="flex items-center justify-between">
+            <span>
+              {line.name} × {line.qty}
+            </span>
+            <span>{line.qty * line.price}/-</span>
+          </li>
+        ))}
+      </ul>
+
+      <div
+        className="mt-3 space-y-1 border-t pt-3 text-xs"
+        style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
+      >
+        <p className="flex justify-between">
+          <span>Subtotal</span>
+          <span>{sampleSubtotal}/-</span>
+        </p>
+        <p className="flex justify-between">
+          <span>GST {SAMPLE_GST_PERCENT}%</span>
+          <span>{sampleGst}/-</span>
+        </p>
+        <p className="flex justify-between text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+          <span>Total</span>
+          <span>₹ {sampleTotal}/-</span>
+        </p>
+      </div>
+
+      <p
+        className="mt-4 rounded-full py-1 text-center text-[11px] font-medium"
+        style={{ background: "var(--mkt-lime)", color: "var(--mkt-lime-ink)" }}
+      >
+        Paid
+      </p>
     </div>
   );
 }

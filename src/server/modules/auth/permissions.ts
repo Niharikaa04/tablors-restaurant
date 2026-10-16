@@ -23,7 +23,8 @@ export type Permission =
   | "support"
   | "subscription"
   | "settings"
-  | "feedback";
+  | "feedback"
+  | "loyalty";
 
 const ALL_OWNER_PORTAL: readonly Permission[] = [
   "overview",
@@ -43,6 +44,7 @@ const ALL_OWNER_PORTAL: readonly Permission[] = [
   "subscription",
   "settings",
   "feedback",
+  "loyalty",
 ];
 
 const ROLE_PERMISSIONS: Record<DemoRole, readonly Permission[]> = {
@@ -61,6 +63,7 @@ const ROLE_PERMISSIONS: Record<DemoRole, readonly Permission[]> = {
     "notifications",
     "support",
     "feedback",
+    "loyalty",
   ],
 
   // Receives payment alerts
@@ -104,6 +107,7 @@ export const OWNER_ROUTE_PERMISSION: Record<string, Permission> = {
   "/owner/staff": "staff",
   "/owner/reservations": "reservations",
   "/owner/offers": "offers",
+  "/owner/loyalty": "loyalty",
   "/owner/notifications": "notifications",
   "/owner/feedback": "feedback",
   "/owner/support": "support",

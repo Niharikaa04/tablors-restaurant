@@ -120,7 +120,7 @@ export default async function ReportsPage({
 
       <Section title="Collected by payment method">
         <div className="grid gap-4 sm:grid-cols-3">
-          {(["cash", "upi", "card"] as const).map((m) => (
+          {(["cash", "qr"] as const).map((m) => (
             <div key={m} className={card}>
               <p className="text-xs uppercase text-[var(--color-text-muted)]">{m}</p>
               <p className="mt-2 text-xl text-[var(--color-text-primary)]">
