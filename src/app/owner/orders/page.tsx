@@ -1,13 +1,15 @@
 import Link from "next/link";
 
 import { LiveRefresh } from "@/components/live/live-refresh";
-import { getOrders, getTables } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import type { Order, RestaurantTable } from "@/server/modules/demo-store/store";
 import {
   acknowledgeWaiter,
   advanceOrderFromForm,
 } from "@/server/modules/orders/actions";
+import { listActiveOrders, listTables } from "@/server/modules/orders/db-orders";
 
-// Orders live in server memory and change constantly — never prerender.
+// Orders change constantly — never prerender.
 export const dynamic = "force-dynamic";
 
 type PageProps = {
@@ -86,10 +88,33 @@ export default async function LiveOrdersPage({ searchParams }: PageProps) {
     typeof notice === "string" ? notice : undefined
   );
 
-  const orders = getOrders()
-    .filter((o) => o.status !== "billed")
-    .sort((a, b) => a.createdAt - b.createdAt);
-  const tables = getTables();
+  let orders: Order[];
+  let tables: RestaurantTable[];
+
+  try {
+    [orders, tables] = await Promise.all([
+      listActiveOrders(DEMO_RESTAURANT_ID),
+      listTables(DEMO_RESTAURANT_ID),
+    ]);
+  } catch (err) {
+    console.error("Live orders query failed", err);
+
+    return (
+      <div>
+        <LiveRefresh />
+        <h1 className="text-2xl text-[var(--color-text-primary)]">
+          Live orders
+        </h1>
+        <div className="mt-4 rounded-[var(--radius-brand)] border border-[var(--color-warning)] bg-[var(--color-warning)]/10 px-4 py-3">
+          <p className="text-sm text-[var(--color-warning)]">
+            Couldn&apos;t load orders from the database. Check the connection
+            and refresh the page.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const waiterCalls = tables.filter((t) => t.waiterCalled);
 
   return (
@@ -165,7 +190,7 @@ export default async function LiveOrdersPage({ searchParams }: PageProps) {
                   </p>
 
                   <p className="text-xs text-[var(--color-text-muted)]">
-                    Order #{order.id} · Status: {getStatusLabel(order.status)}
+                    Order #{order.id.slice(0, 8)} · Status: {getStatusLabel(order.status)}
                     {table?.waiterCalled && (
                       <span className="ml-2 text-[var(--color-gold-500)]">
                         · 🔔 Waiter called
@@ -221,7 +246,7 @@ export default async function LiveOrdersPage({ searchParams }: PageProps) {
 
               <ul className="mt-4 space-y-1 text-sm text-[var(--color-text-secondary)]">
                 {order.lines.map((line) => (
-                  <li key={line.code}>
+                  <li key={line.itemId ?? line.code}>
                     {line.name} × {line.qty}
                   </li>
                 ))}

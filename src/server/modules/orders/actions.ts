@@ -1,23 +1,24 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getDemoRole } from "@/server/modules/auth/session";
+
 import {
-  acknowledgeWaiterCall,
-  callWaiterForTable,
-  createDemoOrder,
-  getBillByOrderId,
-  getMenuItemByCode,
-  getMenuItemById,
-  getTableById,
-  transitionOrder,
-  type MenuItem,
-  type OrderLine,
-  type OrderStatus,
-} from "@/server/modules/demo-store/store";
-import { getEffectivePrice } from "@/lib/menu-shared";
+  getDemoRole,
+  DEMO_RESTAURANT_ID,
+} from "@/server/modules/auth/session";
+
+import type { OrderStatus } from "@/server/modules/demo-store/store";
 import { notify } from "@/server/modules/notifications/store";
+
+import { isOrderPaidDb } from "@/server/modules/billing/db-billing";
+
+import {
+  createOrderInDb,
+  transitionOrderInDb,
+  setWaiterCalledInDb,
+} from "./db-orders";
 
 export type AdvanceFailureCode =
   | "forbidden"
@@ -71,18 +72,15 @@ function revalidateOrderSurfaces(): void {
 /**
  * Moves an order one step through the kitchen flow
  * (new → preparing → ready → served). It can never reach "billed":
- * billing is a separate operation (generateBill).
+ * billing is a separate operation.
  *
- * Staff-only. Called from owner <form> buttons and directly from the
- * kitchen display, so the role check lives here on the server.
- *
- * `expectedStatus` (optional) is the status the caller saw on screen.
- * If the order has moved on since, nothing changes and a "stale"
- * failure is returned, so a double click can't skip a step.
+ * Staff-only. The role check lives here on the server.
+ * expectedStatus is the status the caller saw on screen. If the order
+ * has changed since, nothing changes and a stale failure is returned.
  */
 export async function advanceOrder(
   orderId: string,
-  expectedStatus?: OrderStatus
+  expectedStatus?: OrderStatus,
 ): Promise<AdvanceOrderResult> {
   const role = await getDemoRole();
 
@@ -98,9 +96,25 @@ export async function advanceOrder(
     return fail("invalid");
   }
 
-  const result = transitionOrder(orderId.trim(), expectedStatus);
+  let result;
 
-  // Revalidate on failures too, so a stale screen picks up the latest state.
+  try {
+    result = await transitionOrderInDb(
+      DEMO_RESTAURANT_ID,
+      orderId.trim(),
+      expectedStatus,
+    );
+  } catch (err) {
+    console.error("advanceOrder failed", err);
+
+    return {
+      ok: false,
+      code: "invalid",
+      error: "Could not update the order. Please try again.",
+    };
+  }
+
+  // Revalidate on failures too, so stale screens show the latest state.
   revalidateOrderSurfaces();
 
   if (result.ok) {
@@ -123,11 +137,12 @@ export async function advanceOrder(
 }
 
 /**
- * <form action> wrapper for the Owner Live Orders page. Reads the hidden
- * orderId / expectedStatus fields and, on failure, redirects back with a
- * notice code so the failure is visible instead of silent.
+ * Form-action wrapper for the Owner Live Orders page.
+ * Redirects back with a notice code when an update fails.
  */
-export async function advanceOrderFromForm(formData: FormData): Promise<void> {
+export async function advanceOrderFromForm(
+  formData: FormData,
+): Promise<void> {
   const orderId = formData.get("orderId");
   const expected = formData.get("expectedStatus");
 
@@ -137,7 +152,7 @@ export async function advanceOrderFromForm(formData: FormData): Promise<void> {
 
   const result = await advanceOrder(
     typeof orderId === "string" ? orderId : "",
-    expected ?? undefined
+    expected ?? undefined,
   );
 
   if (!result.ok) {
@@ -147,9 +162,10 @@ export async function advanceOrderFromForm(formData: FormData): Promise<void> {
 
 export type PlaceOrderInput = {
   tableId: string;
-  /** `itemId` (stable id) is preferred when the client has it, so a cart
-   * survives the owner editing an item's code; `code` alone still works
-   * for keypad / direct requests. Price is NEVER accepted from the client. */
+  /**
+   * itemId is preferred when available. code remains supported for keypad
+   * and direct requests. Prices are never accepted from the client.
+   */
   lines: { code: string; qty: number; itemId?: string }[];
 };
 
@@ -157,120 +173,68 @@ export type PlaceOrderResult =
   | { ok: true; orderId: string }
   | { ok: false; error: string };
 
-const MAX_LINE_QTY = 99;
-
 export async function placeCustomerOrder(
-  input: PlaceOrderInput
+  input: PlaceOrderInput,
 ): Promise<PlaceOrderResult> {
-  const table = getTableById(input.tableId);
-
-  if (!table) {
-    return { ok: false, error: "Table not found." };
-  }
-
   if (!Array.isArray(input.lines) || input.lines.length === 0) {
     return { ok: false, error: "Your cart is empty." };
   }
 
-  // Everything below runs against the LIVE canonical menu at the moment
-  // of checkout, so a cart built before the owner changed availability or
-  // price is revalidated here — the browser's copy is never trusted.
-  const problems: string[] = [];
-  const merged = new Map<string, { item: MenuItem; qty: number }>();
+  // Table, menu, availability, quantity limits, and prices are validated
+  // against the database inside one transaction.
+  const result = await createOrderInDb({
+    restaurantId: DEMO_RESTAURANT_ID,
+    tableId: input.tableId,
+    lines: input.lines,
+  });
 
-  for (const line of input.lines) {
-    if (!Number.isInteger(line?.qty) || line.qty < 1 || line.qty > MAX_LINE_QTY) {
-      problems.push(`Quantity must be a whole number from 1 to ${MAX_LINE_QTY}.`);
-      continue;
-    }
-
-    const item =
-      typeof line.itemId === "string" && line.itemId
-        ? getMenuItemById(line.itemId)
-        : getMenuItemByCode(String(line.code));
-
-    if (!item) {
-      problems.push(`Item ${line.code} is no longer on the menu — please remove it.`);
-      continue;
-    }
-
-    if (!item.available) {
-      problems.push(`${item.name} just became unavailable — please remove it.`);
-      continue;
-    }
-
-    const existing = merged.get(item.id);
-    if (existing) existing.qty += line.qty;
-    else merged.set(item.id, { item, qty: line.qty });
+  if (!result.ok) {
+    return result;
   }
 
-  if (problems.length > 0) {
-    // Reject the whole order rather than silently dropping items.
-    return { ok: false, error: Array.from(new Set(problems)).join(" ") };
-  }
+  // Notify only after the database transaction has committed.
+  notify({
+    type: "ORDER_NEW",
+    title: "New order received",
+    message: `New order received from Table ${input.tableId}.`,
+    tableId: input.tableId,
+    orderId: result.orderId,
+    dedupeKey: `order-new:${result.orderId}`,
+  });
 
-  const orderLines: OrderLine[] = [];
-  for (const { item, qty } of merged.values()) {
-    if (qty > MAX_LINE_QTY) {
-      return { ok: false, error: `${item.name}: quantity can't exceed ${MAX_LINE_QTY}.` };
-    }
-    // Snapshot of the item as it is RIGHT NOW. Later menu edits never
-    // reach these fields.
-    orderLines.push({
-      code: item.code,
-      name: item.name,
-      qty,
-      priceRupees: getEffectivePrice(item),
-      itemId: item.id,
-      category: item.category,
-      prepMinutes: item.prepMinutes,
-      basePriceRupees: item.priceRupees,
-      discountPercent: item.discountPercent,
-    });
-  }
+  revalidatePath("/owner/orders");
+  revalidatePath("/owner/tables");
+  revalidatePath("/kitchen");
+  revalidatePath("/owner/notifications");
 
-  if (orderLines.length === 0) {
-    return { ok: false, error: "Your cart is empty." };
-  }
-
-const order = createDemoOrder(input.tableId, orderLines);
-
-// Create a real-time notification for the kitchen and owner.
-notify({
-  type: "ORDER_NEW",
-  title: "New order received",
-  message: `New order received from Table ${input.tableId}.`,
-  tableId: input.tableId,
-  orderId: order.id,
-  dedupeKey: `order-new:${order.id}`,
-});
-
-revalidatePath("/owner/orders");
-revalidatePath("/owner/tables");
-revalidatePath("/kitchen");
-revalidatePath("/owner/notifications");
-
-return {
-  ok: true,
-  orderId: order.id,
-};
+  return { ok: true, orderId: result.orderId };
 }
 
-export type CallWaiterResult = { ok: true } | { ok: false; error: string };
+export type CallWaiterResult =
+  | { ok: true }
+  | { ok: false; error: string };
 
-export async function callWaiter(tableId: string): Promise<CallWaiterResult> {
-  const table = getTableById(tableId);
-  if (!table) {
+export async function callWaiter(
+  tableId: string,
+): Promise<CallWaiterResult> {
+  const ok = await setWaiterCalledInDb(
+    DEMO_RESTAURANT_ID,
+    tableId,
+    true,
+  );
+
+  if (!ok) {
     return { ok: false, error: "Table not found." };
   }
 
-  callWaiterForTable(tableId);
   revalidatePath("/owner/orders");
 
   return { ok: true };
 }
 
-export async function acknowledgeWaiter(tableId: string): Promise<void> {
+export async function acknowledgeWaiter(
+  tableId: string,
+): Promise<void> {
   const role = await getDemoRole();
 
   // Clearing a waiter call is a staff action.
@@ -278,7 +242,12 @@ export async function acknowledgeWaiter(tableId: string): Promise<void> {
     return;
   }
 
-  acknowledgeWaiterCall(tableId);
+  await setWaiterCalledInDb(
+    DEMO_RESTAURANT_ID,
+    tableId,
+    false,
+  );
+
   revalidatePath("/owner/orders");
 }
 
@@ -286,12 +255,13 @@ export type OrderPaymentStatus = {
   paid: boolean;
 };
 
+/**
+ * Reads payment status from the database-backed billing module.
+ */
 export async function checkOrderPaymentStatus(
-  orderId: string
+  orderId: string,
 ): Promise<OrderPaymentStatus> {
-  const bill = getBillByOrderId(orderId);
-
   return {
-    paid: Boolean(bill?.paymentMethod && bill?.paidAt),
+    paid: await isOrderPaidDb(DEMO_RESTAURANT_ID, orderId),
   };
 }

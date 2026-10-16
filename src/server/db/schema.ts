@@ -1,3 +1,4 @@
+
 import { sql } from "drizzle-orm";
 
 import {
@@ -7,13 +8,13 @@ import {
   integer,
   boolean,
   timestamp,
-  jsonb,
+ 
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /**
- * PostgreSQL foundation for Tablor's.
+ * PostgreSQL foundation for Tablor.
  *
  * This schema replaces the Phase-1 in-memory demo store as the persistent
  * source of truth. IDs intentionally remain text-compatible with the
@@ -27,7 +28,6 @@ export const userRole = pgEnum("user_role", [
   "manager",
   "cashier",
   "kitchen",
-  "admin",
 ]);
 
 export const tableStatus = pgEnum("table_status", [
@@ -51,10 +51,7 @@ export const reservationStatus = pgEnum("reservation_status", [
   "cancelled",
 ]);
 
-export const paymentMethod = pgEnum("payment_method", [
-  "cash",
-  "qr",
-]);
+export const paymentMethod = pgEnum("payment_method", ["cash", "qr"]);
 
 export const paymentStatus = pgEnum("payment_status", [
   "unpaid",
@@ -63,10 +60,7 @@ export const paymentStatus = pgEnum("payment_status", [
   "refunded",
 ]);
 
-export const deviceStatus = pgEnum("device_status", [
-  "online",
-  "offline",
-]);
+export const deviceStatus = pgEnum("device_status", ["online", "offline"]);
 
 export const restaurants = pgTable("restaurants", {
   id: text("id").primaryKey(),
@@ -76,8 +70,12 @@ export const restaurants = pgTable("restaurants", {
   email: text("email"),
   city: text("city"),
   timezone: text("timezone").notNull().default("Asia/Kolkata"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 }).enableRLS();
 
 export const users = pgTable(
@@ -93,8 +91,12 @@ export const users = pgTable(
     failedAttempts: integer("failed_attempts").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
     active: boolean("active").notNull().default(true),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     uniqueIndex("users_email_unique").on(t.email),
@@ -109,7 +111,9 @@ export const sessions = pgTable(
     userId: text("user_id").notNull(),
     restaurantId: text("restaurant_id").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("sessions_user_idx").on(t.userId),
@@ -125,7 +129,9 @@ export const areas = pgTable(
     restaurantId: text("restaurant_id").notNull(),
     name: text("name").notNull(),
     sortOrder: integer("sort_order").notNull().default(0),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     uniqueIndex("areas_restaurant_name_unique").on(t.restaurantId, t.name),
@@ -145,11 +151,18 @@ export const restaurantTables = pgTable(
     currentOrderId: text("current_order_id"),
     waiterCalled: boolean("waiter_called").notNull().default(false),
     waiterCalledAt: timestamp("waiter_called_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
-    uniqueIndex("tables_restaurant_number_unique").on(t.restaurantId, t.number),
+    uniqueIndex("tables_restaurant_number_unique").on(
+      t.restaurantId,
+      t.number,
+    ),
     index("tables_restaurant_idx").on(t.restaurantId),
     index("tables_area_idx").on(t.areaId),
   ],
@@ -162,10 +175,15 @@ export const categories = pgTable(
     restaurantId: text("restaurant_id").notNull(),
     name: text("name").notNull(),
     sortOrder: integer("sort_order").notNull().default(0),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
-    uniqueIndex("categories_restaurant_name_unique").on(t.restaurantId, t.name),
+    uniqueIndex("categories_restaurant_name_unique").on(
+      t.restaurantId,
+      t.name,
+    ),
     index("categories_restaurant_idx").on(t.restaurantId),
   ],
 ).enableRLS();
@@ -189,8 +207,12 @@ export const menuItems = pgTable(
     imageMime: text("image_mime"),
     imageData: text("image_data"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     uniqueIndex("menu_items_active_code_unique")
@@ -207,7 +229,9 @@ export const tableSessions = pgTable(
     id: text("id").primaryKey(),
     restaurantId: text("restaurant_id").notNull(),
     tableId: text("table_id").notNull(),
-    openedAt: timestamp("opened_at", { withTimezone: true }).defaultNow().notNull(),
+    openedAt: timestamp("opened_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
     active: boolean("active").notNull().default(true),
   },
@@ -231,8 +255,12 @@ export const devices = pgTable(
     signal: text("signal"),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     uniqueIndex("devices_uid_unique").on(t.deviceUid),
@@ -248,9 +276,10 @@ export const deviceHeartbeats = pgTable(
     restaurantId: text("restaurant_id").notNull(),
     deviceId: text("device_id").notNull(),
     batteryPercent: integer("battery_percent"),
-    signal: text("signal"),
     firmwareVersion: text("firmware_version"),
-    seenAt: timestamp("seen_at", { withTimezone: true }).defaultNow().notNull(),
+    seenAt: timestamp("seen_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("device_heartbeats_device_idx").on(t.deviceId, t.seenAt),
@@ -268,9 +297,15 @@ export const orders = pgTable(
     deviceId: text("device_id"),
     status: orderStatus("status").notNull().default("new"),
     idempotencyKey: text("idempotency_key"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    statusUpdatedAt: timestamp("status_updated_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    statusUpdatedAt: timestamp("status_updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("orders_restaurant_created_idx").on(t.restaurantId, t.createdAt),
@@ -296,7 +331,9 @@ export const orderItems = pgTable(
     basePricePaise: integer("base_price_paise"),
     discountPercent: integer("discount_percent"),
     prepMinutes: integer("prep_minutes"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("order_items_order_idx").on(t.orderId),
@@ -313,7 +350,9 @@ export const orderEvents = pgTable(
     fromStatus: orderStatus("from_status"),
     toStatus: orderStatus("to_status").notNull(),
     actorUserId: text("actor_user_id"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("order_events_order_idx").on(t.orderId, t.createdAt),
@@ -332,8 +371,12 @@ export const reservations = pgTable(
     partySize: integer("party_size").notNull(),
     reservedFor: timestamp("reserved_for", { withTimezone: true }).notNull(),
     status: reservationStatus("status").notNull().default("booked"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("reservations_restaurant_time_idx").on(t.restaurantId, t.reservedFor),
@@ -355,8 +398,12 @@ export const bills = pgTable(
     totalPaise: integer("total_paise").notNull(),
     paymentMethod: paymentMethod("payment_method"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     uniqueIndex("bills_order_unique").on(t.orderId),
@@ -374,12 +421,39 @@ export const payments = pgTable(
     amountPaise: integer("amount_paise").notNull(),
     status: paymentStatus("status").notNull().default("unpaid"),
     transactionId: text("transaction_id"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [
     index("payments_bill_idx").on(t.billId),
     index("payments_restaurant_idx").on(t.restaurantId, t.createdAt),
+    uniqueIndex("payments_txn_unique")
+      .on(t.restaurantId, sql`lower(${t.transactionId})`)
+      .where(sql`${t.transactionId} IS NOT NULL`),
+  ],
+).enableRLS();
+
+export const refunds = pgTable(
+  "refunds",
+  {
+    id: text("id").primaryKey(),
+    restaurantId: text("restaurant_id").notNull(),
+    paymentId: text("payment_id").notNull(),
+    billId: text("bill_id").notNull(),
+    amountPaise: integer("amount_paise").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("refunds_payment_idx").on(t.paymentId),
+    index("refunds_bill_idx").on(t.billId),
+    index("refunds_restaurant_idx").on(t.restaurantId, t.createdAt),
   ],
 ).enableRLS();
 
@@ -389,7 +463,9 @@ export const waiterCalls = pgTable(
     id: text("id").primaryKey(),
     restaurantId: text("restaurant_id").notNull(),
     tableId: text("table_id").notNull(),
-    calledAt: timestamp("called_at", { withTimezone: true }).defaultNow().notNull(),
+    calledAt: timestamp("called_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
     acknowledgedBy: text("acknowledged_by"),
   },
@@ -410,27 +486,11 @@ export const leads = pgTable(
     city: text("city").notNull(),
     tableCount: integer("table_count").notNull(),
     restaurantType: text("restaurant_type").notNull(),
-    receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (t) => [index("leads_received_idx").on(t.receivedAt)],
-).enableRLS();
-
-export const auditLog = pgTable(
-  "audit_log",
-  {
-    id: text("id").primaryKey(),
-    restaurantId: text("restaurant_id"),
-    userId: text("user_id"),
-    action: text("action").notNull(),
-    entityType: text("entity_type").notNull(),
-    entityId: text("entity_id"),
-    metadata: jsonb("metadata"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => [
-    index("audit_restaurant_created_idx").on(t.restaurantId, t.createdAt),
-    index("audit_entity_idx").on(t.entityType, t.entityId),
-  ],
 ).enableRLS();
 
 // Existing notification schema retained.
@@ -463,7 +523,9 @@ export const notifications = pgTable(
     message: text("message").notNull(),
     dedupeKey: text("dedupe_key"),
     status: notifStatus("status").notNull().default("unread"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     readAt: timestamp("read_at", { withTimezone: true }),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   },
