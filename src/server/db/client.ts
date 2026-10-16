@@ -1,6 +1,8 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { loadEnvConfig } from "@next/env";
 
+loadEnvConfig(process.cwd());
 /**
  * Database client bootstrap.
  *
