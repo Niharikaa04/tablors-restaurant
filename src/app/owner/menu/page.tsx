@@ -1,4 +1,8 @@
-import { getMenu, getMenuItemUsage } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import {
+  getMenuDb,
+  getMenuItemUsageDb,
+} from "@/server/modules/data/menu-db";
 import { MenuManager } from "./menu-manager";
 
 /**
@@ -15,8 +19,8 @@ export default async function MenuPage({
 
   return (
     <MenuManager
-      items={getMenu()}
-      usage={getMenuItemUsage()}
+      items={await getMenuDb(DEMO_RESTAURANT_ID)}
+      usage={await getMenuItemUsageDb(DEMO_RESTAURANT_ID)}
       initialCategory={category ?? null}
     />
   );

@@ -24,13 +24,17 @@ export async function GET(req: Request) {
     ? keys.filter((k) => String(k).toLowerCase() === only.toLowerCase())
     : keys;
 
-  const created = toFire.map((type) =>
-    notify({
-      type,
-      title: `TEST ${String(type)}`,
-      message: `Test notification for ${String(type)}`,
-    }),
-  );
+  const created = [];
+
+  for (const type of toFire) {
+    created.push(
+      await notify({
+        type,
+        title: `TEST ${String(type)}`,
+        message: `Test notification for ${String(type)}`,
+      }),
+    );
+  }
 
   return NextResponse.json({
     sessionRole: session.role,
@@ -40,6 +44,6 @@ export async function GET(req: Request) {
       type: n.type,
       targetRoles: n.targetRoles,
     })),
-    visibleToSession: listFor(session.role).length,
+    visibleToSession: (await listFor(session.role)).length,
   });
 }

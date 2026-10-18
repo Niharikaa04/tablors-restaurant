@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getDemoRole } from "@/server/modules/auth/session";
 import { demoLogout } from "@/server/modules/auth/demo-actions";
-import { getLeads, getDevices } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getDevicesDb } from "@/server/modules/data/devices-db";
+import { getLeadsDb } from "@/server/modules/data/devices-db";
 
 export default async function AdminPage() {
   const role = await getDemoRole();
@@ -9,8 +11,8 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
-  const leads = getLeads();
-  const devices = getDevices();
+  const leads = await getLeadsDb();
+  const devices = await getDevicesDb(DEMO_RESTAURANT_ID);
 
   return (
     <div className="min-h-screen bg-[var(--color-surface-0)] px-6 py-8">

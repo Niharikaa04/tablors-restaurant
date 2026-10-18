@@ -1,3 +1,15 @@
+import "server-only";
+
+import { randomUUID } from "node:crypto";
+
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import {
+  deleteDoc,
+  getDoc,
+  listDocs,
+  putDoc,
+} from "@/server/modules/data/documents";
+
 export type OfferType =
   | "fixed_price"
   | "percentage"
@@ -60,105 +72,63 @@ export type Offer = {
   updatedAt: number;
 };
 
-const offers: Offer[] = [];
+const COLLECTION = "offers";
+const RID = DEMO_RESTAURANT_ID;
 
-let offerCounter = 0;
-
-function nextOfferId(): string {
-  offerCounter += 1;
-  return `offer-${offerCounter}`;
+export async function getOffers(): Promise<Offer[]> {
+  return (await listDocs<Offer>(RID, COLLECTION)).map((d) => d.data);
 }
 
-export function getOffers(): Offer[] {
-  return offers;
+export async function getOfferById(id: string): Promise<Offer | null> {
+  return getDoc<Offer>(RID, COLLECTION, id);
 }
 
-export function getOfferById(id: string): Offer | null {
-  return offers.find((offer) => offer.id === id) ?? null;
+function isLive(offer: Offer, now: number): boolean {
+  return offer.active && offer.startsAt <= now && offer.endsAt > now;
 }
 
-export function getActiveOffers(now = Date.now()): Offer[] {
-  return offers.filter(
-    (offer) =>
-      offer.active &&
-      offer.startsAt <= now &&
-      offer.endsAt > now
-  );
+export async function getActiveOffers(now = Date.now()): Promise<Offer[]> {
+  return (await getOffers()).filter((offer) => isLive(offer, now));
 }
 
-export type CreateOfferInput = Omit<
-  Offer,
-  "id" | "createdAt" | "updatedAt"
->;
+export type CreateOfferInput = Omit<Offer, "id" | "createdAt" | "updatedAt">;
 
-export function createOffer(input: CreateOfferInput): Offer {
+export async function createOffer(input: CreateOfferInput): Promise<Offer> {
   const now = Date.now();
-
   const offer: Offer = {
     ...input,
-    id: nextOfferId(),
+    id: `offer-${randomUUID()}`,
     createdAt: now,
     updatedAt: now,
   };
-
-  offers.push(offer);
-
+  await putDoc(RID, COLLECTION, offer.id, offer);
   return offer;
 }
 
 export type UpdateOfferInput = Partial<CreateOfferInput>;
 
-export function updateOffer(
+export async function updateOffer(
   id: string,
-  input: UpdateOfferInput
-): Offer | null {
-  const offer = getOfferById(id);
-
-  if (!offer) {
-    return null;
-  }
-
-  Object.assign(offer, input, {
-    updatedAt: Date.now(),
-  });
-
-  return offer;
+  input: UpdateOfferInput,
+): Promise<Offer | null> {
+  const offer = await getOfferById(id);
+  if (!offer) return null;
+  const updated: Offer = { ...offer, ...input, updatedAt: Date.now() };
+  await putDoc(RID, COLLECTION, id, updated);
+  return updated;
 }
 
-export function deleteOffer(id: string): boolean {
-  const index = offers.findIndex((offer) => offer.id === id);
-
-  if (index === -1) {
-    return false;
-  }
-
-  offers.splice(index, 1);
-
-  return true;
+export async function deleteOffer(id: string): Promise<boolean> {
+  return deleteDoc(RID, COLLECTION, id);
 }
 
-export function setOfferActive(
+export async function setOfferActive(
   id: string,
-  active: boolean
-): Offer | null {
-  const offer = getOfferById(id);
-
-  if (!offer) {
-    return null;
-  }
-
-  offer.active = active;
-  offer.updatedAt = Date.now();
-
-  return offer;
+  active: boolean,
+): Promise<Offer | null> {
+  return updateOffer(id, { active });
 }
-export function getActiveOfferCount(): number {
-  const now = Date.now();
 
-  return offers.filter(
-    (offer) =>
-      offer.active &&
-      offer.startsAt <= now &&
-      offer.endsAt > now
-  ).length;
+export async function getActiveOfferCount(): Promise<number> {
+  return (await getActiveOffers()).length;
 }

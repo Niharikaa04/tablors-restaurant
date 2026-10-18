@@ -9,7 +9,7 @@ import Link from "next/link";
 
 // Set these to the real pixel dimensions of public/brand/tablor-logo.svg
 // (used only to reserve layout space; rendering keeps the true ratio).
-const INTRINSIC = { width: 600, height: 200 };
+const INTRINSIC = { width: 800, height: 316 };
 
 const WIDTHS = {
   sm: 96,

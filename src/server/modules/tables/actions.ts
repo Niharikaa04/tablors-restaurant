@@ -3,11 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getDemoRole } from "@/server/modules/auth/session";
 import {
-  createRestaurantTable,
-  removeRestaurantTable,
-} from "@/server/modules/demo-store/store";
+  DEMO_RESTAURANT_ID,
+  getDemoRole,
+} from "@/server/modules/auth/session";
+import {
+  createTableDb,
+  removeTableDb,
+} from "@/server/modules/data/tables-db";
 
 export async function createTableAction(
   formData: FormData
@@ -26,8 +29,7 @@ export async function createTableAction(
       ? value.trim()
       : "";
 
-  const result =
-    createRestaurantTable(label);
+  const result = await createTableDb(DEMO_RESTAURANT_ID, label);
 
   if (!result.ok) {
     return;
@@ -58,7 +60,7 @@ export async function removeTableAction(
     return;
   }
 
-  const result = removeRestaurantTable(tableId);
+  const result = await removeTableDb(DEMO_RESTAURANT_ID, tableId);
 
   if (!result.ok) {
     return;

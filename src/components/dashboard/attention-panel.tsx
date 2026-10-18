@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { AlertCircle, ArrowRight } from "lucide-react";
-import { getDevices, getMenu, getTodayOverview } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getTodayOverviewDb } from "@/server/modules/data/analytics-db";
+import { getDevicesDb } from "@/server/modules/data/devices-db";
+import { getMenuDb } from "@/server/modules/data/menu-db";
 
-export function AttentionPanel() {
-  const overview = getTodayOverview();
-  const unavailableCount = getMenu().filter((m) => !m.available).length;
-  const offlineCount = getDevices().filter((d) => !d.online).length;
+export async function AttentionPanel() {
+  const overview = await getTodayOverviewDb(DEMO_RESTAURANT_ID);
+  const unavailableCount = (await getMenuDb(DEMO_RESTAURANT_ID)).filter((m) => !m.available).length;
+  const offlineCount = (await getDevicesDb(DEMO_RESTAURANT_ID)).filter((d) => !d.online).length;
 
   const items = [
     overview.newOrders > 0 && {

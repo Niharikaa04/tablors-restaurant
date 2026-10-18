@@ -6,13 +6,18 @@ import { hasPermission } from "@/server/modules/auth/permissions";
 import { getDemoSession, type DemoSession } from "@/server/modules/auth/session";
 import {
   SLOT_MINUTES,
-  createReservation,
-  getReservation,
   reservedForToday,
   formatTimeLabel,
-  setReservationStatus,
 } from "@/server/modules/demo-store/reservations";
-import { getTableById, setTableStatus } from "@/server/modules/demo-store/store";
+import {
+  createReservationDb,
+  getReservationDb,
+  setReservationStatusDb,
+} from "@/server/modules/data/reservations-db";
+import {
+  getTableByIdDb,
+  setTableStatusDb,
+} from "@/server/modules/data/tables-db";
 import { notify } from "@/server/modules/notifications/store";
 
 export type ReservationActionResult = { ok: true } | { ok: false; error: string };
@@ -61,10 +66,10 @@ export async function reserveAction(input: unknown): Promise<ReservationActionRe
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid input");
   const data = parsed.data;
 
-  const table = getTableById(data.tableId);
+  const table = await getTableByIdDb(session.restaurantId, data.tableId);
   if (!table) return fail("Table not found.");
 
-  const result = createReservation(session.restaurantId, {
+  const result = await createReservationDb(session.restaurantId, {
     tableId: table.id,
     guestName: data.guestName,
     phone: data.phone,
@@ -78,7 +83,7 @@ export async function reserveAction(input: unknown): Promise<ReservationActionRe
         : "Table not found."
     );
   }
-    notify({
+  await notify({
     type: "TABLE_RESERVED",
     title: "Table reserved",
     message: `Table ${result.reservation.tableId} reserved for ${formatTimeLabel(result.reservation.reservedFor)}.`,
@@ -98,11 +103,11 @@ export async function cancelReservationAction(id: unknown): Promise<ReservationA
   const parsedId = idSchema.safeParse(id);
   if (!parsedId.success) return fail("Invalid reservation.");
 
-  const reservation = getReservation(session.restaurantId, parsedId.data);
+  const reservation = await getReservationDb(session.restaurantId, parsedId.data);
   if (!reservation) return fail("Reservation not found.");
   if (reservation.status !== "booked") return fail("Only booked reservations can be cancelled.");
 
-  setReservationStatus(session.restaurantId, reservation.id, "cancelled");
+  await setReservationStatusDb(session.restaurantId, reservation.id, "cancelled");
   refresh();
   return { ok: true };
 }
@@ -115,20 +120,20 @@ export async function checkInReservationAction(id: unknown): Promise<Reservation
   const parsedId = idSchema.safeParse(id);
   if (!parsedId.success) return fail("Invalid reservation.");
 
-  const reservation = getReservation(session.restaurantId, parsedId.data);
+  const reservation = await getReservationDb(session.restaurantId, parsedId.data);
   if (!reservation) return fail("Reservation not found.");
   if (reservation.status !== "booked") return fail("Only booked reservations can be checked in.");
 
-  const table = getTableById(reservation.tableId);
+  const table = await getTableByIdDb(session.restaurantId, reservation.tableId);
   if (!table) return fail("This table no longer exists.");
   if (table.currentOrderId !== null) {
     return fail(`${table.label} still has an active order. Finish it before checking in this guest.`);
   }
 
-  const moved = setTableStatus(table.id, "occupied");
+  const moved = await setTableStatusDb(session.restaurantId, table.id, "occupied");
   if (!moved.ok) return fail("Could not update the table.");
 
-  setReservationStatus(session.restaurantId, reservation.id, "checked_in");
+  await setReservationStatusDb(session.restaurantId, reservation.id, "checked_in");
   refresh();
   return { ok: true };
 }
@@ -147,11 +152,15 @@ export async function markTableAction(
   const parsedStatus = tableStatusSchema.safeParse(status);
   if (!parsedId.success || !parsedStatus.success) return fail("Invalid request.");
 
-  const reservation = getReservation(session.restaurantId, parsedId.data);
+  const reservation = await getReservationDb(session.restaurantId, parsedId.data);
   if (!reservation) return fail("Reservation not found.");
   if (reservation.status === "cancelled") return fail("This reservation is cancelled.");
 
-  const result = setTableStatus(reservation.tableId, parsedStatus.data);
+  const result = await setTableStatusDb(
+    session.restaurantId,
+    reservation.tableId,
+    parsedStatus.data,
+  );
   if (!result.ok) {
     return fail(
       result.reason === "has-active-order"

@@ -1,0 +1,1061 @@
+From fe56c2b7761b55c6a2024fa8ec4586c11fbfe7bb Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 17 Oct 2026 13:03:02 +0000
+Subject: [PATCH] Itemised, printable bill receipt from PostgreSQL; remove Open
+ UPI App button; additive migration
+
+---
+ docs/db-setup-runbook.md                      |   5 +-
+ scripts/sql/001_bill_receipt.sql              |  19 ++
+ .../customer/device/bill-receipt.tsx          | 264 ++++++++++++++++++
+ .../customer/device/payment-panel.tsx         | 114 ++------
+ src/server/db/schema.ts                       |   6 +
+ src/server/modules/billing/db-billing.ts      | 107 +++++++
+ src/server/modules/customer/actions.ts        |  42 ++-
+ src/server/modules/orders/db-orders.ts        |   1 +
+ tests/db/receipt.test.ts                      | 182 ++++++++++++
+ tests/payment-panel.test.ts                   |  75 +++++
+ 10 files changed, 705 insertions(+), 110 deletions(-)
+ create mode 100644 scripts/sql/001_bill_receipt.sql
+ create mode 100644 src/components/customer/device/bill-receipt.tsx
+ create mode 100644 tests/db/receipt.test.ts
+ create mode 100644 tests/payment-panel.test.ts
+
+diff --git a/docs/db-setup-runbook.md b/docs/db-setup-runbook.md
+index 008edaa..ec7e777 100644
+--- a/docs/db-setup-runbook.md
++++ b/docs/db-setup-runbook.md
+@@ -7,7 +7,10 @@ The app reads/writes orders, bills, payments and table state in PostgreSQL. An e
+    `vercel env pull .env.production.local --environment=production`
+ 2. Check the target and schema (read-only):
+    `NODE_ENV=production npm run db:verify`
+-3. If the schema is behind: `NODE_ENV=production npm run db:push` (read prompts about drops carefully).
++3. Itemised-bill columns (run BEFORE deploying code that reads them; additive + idempotent):
++   `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/sql/001_bill_receipt.sql`
++   (or paste the file into the Supabase SQL editor). `db:verify` reports the columns if missing.
++3b. If the schema is otherwise behind: `NODE_ENV=production npm run db:push` (read prompts about drops carefully).
+ 4. Seed reference data (dry run first, then apply; additive, idempotent):
+    `NODE_ENV=production npm run db:seed` → `NODE_ENV=production npm run db:seed -- --apply`
+ 5. Table QR codes must encode `https://<domain>/customer/<tables.id>` (e.g. `/customer/t05`); `db:verify` prints them.
+diff --git a/scripts/sql/001_bill_receipt.sql b/scripts/sql/001_bill_receipt.sql
+new file mode 100644
+index 0000000..2b7d0f6
+--- /dev/null
++++ b/scripts/sql/001_bill_receipt.sql
+@@ -0,0 +1,19 @@
++-- Additive, idempotent migration for itemised bills / printable receipts.
++-- Safe to run more than once. Never drops, truncates or rewrites existing data
++-- (other than filling the new line_total_paise column on legacy rows).
++-- Run BEFORE deploying the code that reads these columns.
++
++BEGIN;
++
++-- Stored line total for every ordered item (qty * unit price, in paise).
++ALTER TABLE order_items ADD COLUMN IF NOT EXISTS line_total_paise integer;
++UPDATE order_items
++   SET line_total_paise = qty * price_paise
++ WHERE line_total_paise IS NULL;
++
++-- Human-readable sequence numbers (BILL-001 / ORD-001). Identity columns
++-- back-fill existing rows automatically.
++ALTER TABLE bills  ADD COLUMN IF NOT EXISTS bill_number  integer GENERATED ALWAYS AS IDENTITY;
++ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_number integer GENERATED ALWAYS AS IDENTITY;
++
++COMMIT;
+diff --git a/src/components/customer/device/bill-receipt.tsx b/src/components/customer/device/bill-receipt.tsx
+new file mode 100644
+index 0000000..c530d85
+--- /dev/null
++++ b/src/components/customer/device/bill-receipt.tsx
+@@ -0,0 +1,264 @@
++"use client";
++
++import type { BillReceipt } from "@/server/modules/billing/db-billing";
++
++/**
++ * Itemised restaurant receipt. Every value comes from the BillReceipt that the
++ * server read from PostgreSQL; nothing is recomputed or invented here.
++ */
++
++export function money(value: number): string {
++  return `₹${value.toLocaleString("en-IN", {
++    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
++    maximumFractionDigits: 2,
++  })}`;
++}
++
++export function statusLabel(status: BillReceipt["status"]): string {
++  switch (status) {
++    case "paid":
++      return "Paid";
++    case "partial":
++      return "Partially Paid";
++    case "refunded":
++      return "Refunded";
++    default:
++      return "Pending";
++  }
++}
++
++function methodLabel(method: "cash" | "qr"): string {
++  return method === "qr" ? "QR" : "Cash";
++}
++
++export function formatReceiptDate(iso: string): string {
++  return new Date(iso).toLocaleString("en-IN", {
++    timeZone: "Asia/Kolkata",
++    day: "2-digit",
++    month: "short",
++    year: "numeric",
++    hour: "2-digit",
++    minute: "2-digit",
++    hour12: true,
++  });
++}
++
++export function BillReceiptView({
++  receipt,
++  restaurantName,
++}: {
++  receipt: BillReceipt;
++  restaurantName: string;
++}) {
++  const hasAdjustments =
++    receipt.gstRupees > 0 ||
++    receipt.serviceChargeRupees > 0 ||
++    receipt.discountRupees > 0;
++
++  return (
++    <div
++      className="rounded-lg bg-white p-4 text-[12px] leading-5 text-neutral-900"
++      data-testid="bill-receipt"
++    >
++      <div className="text-center">
++        <p className="text-sm font-bold uppercase tracking-wide">
++          {restaurantName} — Restaurant Bill
++        </p>
++      </div>
++
++      <dl className="mt-3 space-y-0.5">
++        <div className="flex justify-between">
++          <dt>Bill No</dt>
++          <dd className="font-semibold">{receipt.billNumber}</dd>
++        </div>
++        {receipt.orderNumber && (
++          <div className="flex justify-between">
++            <dt>Order No</dt>
++            <dd className="font-semibold">{receipt.orderNumber}</dd>
++          </div>
++        )}
++        <div className="flex justify-between">
++          <dt>Date</dt>
++          <dd>{formatReceiptDate(receipt.issuedAt)}</dd>
++        </div>
++        <div className="flex justify-between">
++          <dt>Table</dt>
++          <dd className="font-semibold">{receipt.tableLabel}</dd>
++        </div>
++      </dl>
++
++      <table className="mt-3 w-full border-t border-dashed border-neutral-400">
++        <thead>
++          <tr className="border-b border-dashed border-neutral-400 text-left">
++            <th className="py-1 font-semibold">Item</th>
++            <th className="py-1 text-right font-semibold">Qty</th>
++            <th className="py-1 text-right font-semibold">Price</th>
++            <th className="py-1 text-right font-semibold">Amount</th>
++          </tr>
++        </thead>
++        <tbody>
++          {receipt.lines.map((line, i) => (
++            <tr key={`${line.name}-${i}`} className="align-top">
++              <td className="py-0.5 pr-2">{line.name}</td>
++              <td className="py-0.5 text-right">{line.qty}</td>
++              <td className="py-0.5 text-right">{money(line.unitRupees)}</td>
++              <td className="py-0.5 text-right">{money(line.lineRupees)}</td>
++            </tr>
++          ))}
++        </tbody>
++      </table>
++
++      <div className="mt-2 space-y-0.5 border-t border-dashed border-neutral-400 pt-2">
++        <div className="flex justify-between">
++          <span>Subtotal</span>
++          <span>{money(receipt.subtotalRupees)}</span>
++        </div>
++        {receipt.gstRupees > 0 && (
++          <div className="flex justify-between">
++            <span>GST</span>
++            <span>{money(receipt.gstRupees)}</span>
++          </div>
++        )}
++        {receipt.serviceChargeRupees > 0 && (
++          <div className="flex justify-between">
++            <span>Service charge</span>
++            <span>{money(receipt.serviceChargeRupees)}</span>
++          </div>
++        )}
++        {receipt.discountRupees > 0 && (
++          <div className="flex justify-between">
++            <span>Discount</span>
++            <span>−{money(receipt.discountRupees)}</span>
++          </div>
++        )}
++        {!hasAdjustments && (
++          <div className="flex justify-between text-neutral-500">
++            <span>Tax / discount</span>
++            <span>None</span>
++          </div>
++        )}
++        <div className="flex justify-between border-t border-neutral-400 pt-1 text-sm font-bold">
++          <span>Total</span>
++          <span>{money(receipt.totalRupees)}</span>
++        </div>
++        <div className="flex justify-between">
++          <span>Paid</span>
++          <span>{money(receipt.paidRupees)}</span>
++        </div>
++        <div className="flex justify-between font-semibold">
++          <span>Balance Due</span>
++          <span>{money(receipt.remainingRupees)}</span>
++        </div>
++      </div>
++
++      {receipt.payments.length > 0 && (
++        <div className="mt-2 border-t border-dashed border-neutral-400 pt-2">
++          <p className="font-semibold">Payments</p>
++          {receipt.payments.map((p, i) => (
++            <div key={i} className="flex justify-between gap-2">
++              <span>
++                {methodLabel(p.method)}
++                {p.transactionId ? ` · Ref ${p.transactionId}` : ""}
++              </span>
++              <span>{money(p.amountRupees)}</span>
++            </div>
++          ))}
++        </div>
++      )}
++
++      <p className="mt-3 border-t border-dashed border-neutral-400 pt-2 text-center font-bold uppercase">
++        Payment Status: {statusLabel(receipt.status)}
++      </p>
++    </div>
++  );
++}
++
++function esc(value: string): string {
++  return value
++    .replace(/&/g, "&amp;")
++    .replace(/</g, "&lt;")
++    .replace(/>/g, "&gt;")
++    .replace(/"/g, "&quot;");
++}
++
++/** Prints only the receipt (hidden iframe, no popup blocker, no global CSS). */
++export function printReceipt(receipt: BillReceipt, restaurantName: string): void {
++  const rows = receipt.lines
++    .map(
++      (l) =>
++        `<tr><td>${esc(l.name)}</td><td class="r">${l.qty}</td><td class="r">${esc(
++          money(l.unitRupees)
++        )}</td><td class="r">${esc(money(l.lineRupees))}</td></tr>`
++    )
++    .join("");
++
++  const row = (label: string, value: string, cls = "") =>
++    `<div class="row ${cls}"><span>${esc(label)}</span><span>${esc(value)}</span></div>`;
++
++  const payments = receipt.payments
++    .map((p) =>
++      row(
++        `${methodLabel(p.method)}${p.transactionId ? ` · Ref ${p.transactionId}` : ""}`,
++        money(p.amountRupees)
++      )
++    )
++    .join("");
++
++  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(
++    receipt.billNumber
++  )}</title><style>
++    @page { margin: 8mm; }
++    body { font: 12px/1.5 "Courier New", monospace; color: #000; max-width: 360px; margin: 0 auto; }
++    h1 { font-size: 14px; text-align: center; text-transform: uppercase; margin: 0 0 8px; }
++    .row { display: flex; justify-content: space-between; gap: 8px; }
++    .b { font-weight: 700; } .tot { font-size: 14px; font-weight: 700; border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; }
++    table { width: 100%; border-collapse: collapse; margin: 8px 0; border-top: 1px dashed #000; }
++    th, td { text-align: left; padding: 2px 0; vertical-align: top; } th { border-bottom: 1px dashed #000; }
++    .r { text-align: right; } .sec { border-top: 1px dashed #000; margin-top: 6px; padding-top: 6px; }
++    .c { text-align: center; font-weight: 700; text-transform: uppercase; }
++  </style></head><body>
++    <h1>${esc(restaurantName)} — Restaurant Bill</h1>
++    ${row("Bill No", receipt.billNumber, "b")}
++    ${receipt.orderNumber ? row("Order No", receipt.orderNumber, "b") : ""}
++    ${row("Date", formatReceiptDate(receipt.issuedAt))}
++    ${row("Table", receipt.tableLabel, "b")}
++    <table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Amount</th></tr></thead><tbody>${rows}</tbody></table>
++    <div class="sec">
++      ${row("Subtotal", money(receipt.subtotalRupees))}
++      ${receipt.gstRupees > 0 ? row("GST", money(receipt.gstRupees)) : ""}
++      ${receipt.serviceChargeRupees > 0 ? row("Service charge", money(receipt.serviceChargeRupees)) : ""}
++      ${receipt.discountRupees > 0 ? row("Discount", `-${money(receipt.discountRupees)}`) : ""}
++      ${row("Total", money(receipt.totalRupees), "tot")}
++      ${row("Paid", money(receipt.paidRupees))}
++      ${row("Balance Due", money(receipt.remainingRupees), "b")}
++    </div>
++    ${payments ? `<div class="sec"><div class="b">Payments</div>${payments}</div>` : ""}
++    <div class="sec c">Payment Status: ${esc(statusLabel(receipt.status))}</div>
++  </body></html>`;
++
++  const frame = document.createElement("iframe");
++  frame.setAttribute("aria-hidden", "true");
++  frame.style.cssText =
++    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
++  document.body.appendChild(frame);
++
++  const doc = frame.contentDocument;
++  const win = frame.contentWindow;
++  if (!doc || !win) {
++    frame.remove();
++    return;
++  }
++
++  doc.open();
++  doc.write(html);
++  doc.close();
++
++  const cleanup = () => window.setTimeout(() => frame.remove(), 500);
++  win.addEventListener("afterprint", cleanup);
++  window.setTimeout(() => {
++    win.focus();
++    win.print();
++  }, 100);
++  // Safety net in case afterprint never fires.
++  window.setTimeout(() => frame.remove(), 60_000);
++}
+diff --git a/src/components/customer/device/payment-panel.tsx b/src/components/customer/device/payment-panel.tsx
+index 784e613..b407ad9 100644
+--- a/src/components/customer/device/payment-panel.tsx
++++ b/src/components/customer/device/payment-panel.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { QRCodeSVG } from "qrcode.react";
+ import type { CustomerBillState } from "@/server/modules/customer/actions";
++import { BillReceiptView, printReceipt } from "./bill-receipt";
+ 
+ /*
+  * DEMO MODE
+@@ -140,7 +141,7 @@ export function PaymentPanel({
+                 className="text-sm font-semibold"
+                 style={{ color: "var(--device-gold)" }}
+               >
+-                BILL #{bill.billId}
++                BILL {bill.receipt.billNumber}
+               </p>
+ 
+               <p
+@@ -161,91 +162,24 @@ export function PaymentPanel({
+             </button>
+           </div>
+ 
+-          <div
+-            className="mt-5 rounded-xl border p-4"
++          <div className="mt-5">
++            <BillReceiptView
++              receipt={bill.receipt}
++              restaurantName={bill.restaurantName}
++            />
++          </div>
++
++          <button
++            type="button"
++            onClick={() => printReceipt(bill.receipt, bill.restaurantName)}
++            className="mt-3 w-full rounded-md border py-2 text-xs font-semibold"
+             style={{
+               borderColor: "var(--device-shell-border)",
+-              background: "var(--device-lcd-bg)",
++              color: "var(--device-lcd-text)",
+             }}
+           >
+-            <div className="flex items-center justify-between">
+-              <span
+-                className="text-xs"
+-                style={{ color: "var(--device-lcd-muted)" }}
+-              >
+-                Bill Number
+-              </span>
+-
+-              <span
+-                className="text-sm font-semibold"
+-                style={{ color: "var(--device-lcd-text)" }}
+-              >
+-                #{bill.billId}
+-              </span>
+-            </div>
+-
+-            <div
+-              className="my-4 border-t"
+-              style={{ borderColor: "var(--device-shell-border)" }}
+-            />
+-
+-            <div className="space-y-3 text-sm">
+-              <div className="flex items-center justify-between">
+-                <span style={{ color: "var(--device-lcd-muted)" }}>
+-                  Total Amount
+-                </span>
+-
+-                <span
+-                  className="font-semibold"
+-                  style={{ color: "var(--device-lcd-text)" }}
+-                >
+-                  {rupees(bill.totalRupees)}
+-                </span>
+-              </div>
+-
+-              <div className="flex items-center justify-between">
+-                <span style={{ color: "var(--device-lcd-muted)" }}>
+-                  Paid
+-                </span>
+-
+-                <span
+-                  className="font-semibold"
+-                  style={{ color: "var(--device-lcd-text)" }}
+-                >
+-                  {rupees(bill.paidRupees)}
+-                </span>
+-              </div>
+-
+-              <div className="flex items-center justify-between">
+-                <span style={{ color: "var(--device-lcd-muted)" }}>
+-                  Remaining
+-                </span>
+-
+-                <span
+-                  className="font-bold"
+-                  style={{ color: "var(--device-gold)" }}
+-                >
+-                  {rupees(bill.remainingRupees)}
+-                </span>
+-              </div>
+-            </div>
+-
+-            <div
+-              className="mt-4 rounded-lg border px-3 py-2 text-center text-xs font-semibold"
+-              style={{
+-                borderColor: "var(--device-shell-border)",
+-                color: paid
+-                  ? "var(--device-gold)"
+-                  : "var(--device-lcd-muted)",
+-              }}
+-            >
+-              {paid
+-                ? "PAID"
+-                : partial
+-                  ? "PARTIALLY PAID"
+-                  : "PAYMENT PENDING"}
+-            </div>
+-          </div>
++            Print Bill
++          </button>
+ 
+           {paid && (
+             <p
+@@ -299,7 +233,7 @@ export function PaymentPanel({
+               className="text-sm font-semibold"
+               style={{ color: "var(--device-gold)" }}
+             >
+-              PAY BILL #{bill.billId}
++              PAY BILL {bill.receipt.billNumber}
+             </p>
+ 
+             <p
+@@ -484,20 +418,6 @@ export function PaymentPanel({
+                 </p>
+               )}
+             </div>
+-
+-            {/* Open UPI app */}
+-            {upiUri && (
+-              <a
+-                href={upiUri}
+-                className="mt-3 block rounded-md py-3 text-center text-sm font-semibold"
+-                style={{
+-                  background: "var(--device-gold)",
+-                  color: "#171a10",
+-                }}
+-              >
+-                Open UPI App
+-              </a>
+-            )}
+           </>
+         )}
+       </div>
+diff --git a/src/server/db/schema.ts b/src/server/db/schema.ts
+index 1e87643..439cd0a 100644
+--- a/src/server/db/schema.ts
++++ b/src/server/db/schema.ts
+@@ -297,6 +297,8 @@ export const orders = pgTable(
+     deviceId: text("device_id"),
+     status: orderStatus("status").notNull().default("new"),
+     idempotencyKey: text("idempotency_key"),
++    /** Human-readable sequence shown as ORD-001. */
++    orderNumber: integer("order_number").generatedAlwaysAsIdentity(),
+     createdAt: timestamp("created_at", { withTimezone: true })
+       .defaultNow()
+       .notNull(),
+@@ -328,6 +330,8 @@ export const orderItems = pgTable(
+     categorySnapshot: text("category_snapshot"),
+     qty: integer("qty").notNull(),
+     pricePaise: integer("price_paise").notNull(),
++    /** qty * price_paise, stored at order time. NULL only on legacy rows. */
++    lineTotalPaise: integer("line_total_paise"),
+     basePricePaise: integer("base_price_paise"),
+     discountPercent: integer("discount_percent"),
+     prepMinutes: integer("prep_minutes"),
+@@ -396,6 +400,8 @@ export const bills = pgTable(
+     discountPaise: integer("discount_paise").notNull().default(0),
+     serviceChargePaise: integer("service_charge_paise").notNull().default(0),
+     totalPaise: integer("total_paise").notNull(),
++    /** Human-readable sequence shown as BILL-001. */
++    billNumber: integer("bill_number").generatedAlwaysAsIdentity(),
+     paymentMethod: paymentMethod("payment_method"),
+     paidAt: timestamp("paid_at", { withTimezone: true }),
+     createdAt: timestamp("created_at", { withTimezone: true })
+diff --git a/src/server/modules/billing/db-billing.ts b/src/server/modules/billing/db-billing.ts
+index 335524f..4b05ac4 100644
+--- a/src/server/modules/billing/db-billing.ts
++++ b/src/server/modules/billing/db-billing.ts
+@@ -179,6 +179,113 @@ export async function getBillPaymentSummaryDb(
+   return bill ? summaryFor(db, bill) : null;
+ }
+ 
++// ---- itemised receipt -----------------------------------------------------
++
++export type BillReceiptLine = {
++  name: string;
++  qty: number;
++  unitRupees: number;
++  lineRupees: number;
++};
++
++export type BillReceipt = {
++  /** BILL-001 style label. */
++  billNumber: string;
++  /** ORD-001 style label (null only if the order row is missing). */
++  orderNumber: string | null;
++  /** ISO timestamp the bill was generated. */
++  issuedAt: string;
++  tableLabel: string;
++  lines: BillReceiptLine[];
++  subtotalRupees: number;
++  gstRupees: number;
++  serviceChargeRupees: number;
++  discountRupees: number;
++  totalRupees: number;
++  paidRupees: number;
++  remainingRupees: number;
++  status: PaymentStatus;
++  payments: {
++    method: "cash" | "qr";
++    amountRupees: number;
++    transactionId: string | null;
++    paidAt: string;
++  }[];
++};
++
++export function formatSequence(prefix: "BILL" | "ORD", n: number | null): string | null {
++  return n === null || n === undefined ? null : `${prefix}-${String(n).padStart(3, "0")}`;
++}
++
++/**
++ * Everything the bill popup / printable receipt shows, read from PostgreSQL:
++ * the bill, the order's persisted line items (name snapshot, qty, unit price,
++ * line total), the table, and the recorded payments. Nothing is recomputed
++ * from the menu, so the receipt always matches what was actually ordered.
++ */
++export async function getBillReceiptDb(
++  restaurantId: string,
++  billId: string
++): Promise<BillReceipt | null> {
++  const [row] = await db
++    .select()
++    .from(bills)
++    .where(and(eq(bills.id, billId), eq(bills.restaurantId, restaurantId)));
++  if (!row) return null;
++
++  const bill = toBill(row);
++
++  const [orderRow] = await db
++    .select({ orderNumber: orders.orderNumber })
++    .from(orders)
++    .where(and(eq(orders.id, row.orderId), eq(orders.restaurantId, restaurantId)));
++
++  const [tableRow] = await db
++    .select({ label: restaurantTables.label })
++    .from(restaurantTables)
++    .where(
++      and(
++        eq(restaurantTables.id, row.tableId),
++        eq(restaurantTables.restaurantId, restaurantId)
++      )
++    );
++
++  const itemRows = await db
++    .select()
++    .from(orderItems)
++    .where(eq(orderItems.orderId, row.orderId))
++    .orderBy(asc(orderItems.createdAt), asc(orderItems.nameSnapshot));
++
++  const summary = await summaryFor(db, bill);
++
++  return {
++    billNumber: formatSequence("BILL", row.billNumber) ?? row.id,
++    orderNumber: formatSequence("ORD", orderRow?.orderNumber ?? null),
++    issuedAt: row.createdAt.toISOString(),
++    tableLabel: tableRow?.label ?? row.tableId,
++    lines: itemRows.map((i) => ({
++      name: i.nameSnapshot,
++      qty: i.qty,
++      unitRupees: i.pricePaise / 100,
++      lineRupees: (i.lineTotalPaise ?? i.qty * i.pricePaise) / 100,
++    })),
++    subtotalRupees: bill.subtotalRupees,
++    gstRupees: bill.gstRupees,
++    serviceChargeRupees: bill.serviceChargeRupees,
++    discountRupees: bill.discountRupees,
++    totalRupees: bill.totalRupees,
++    paidRupees: summary.paidRupees,
++    remainingRupees: summary.remainingRupees,
++    status: summary.status,
++    payments: summary.payments.map((p) => ({
++      method: p.method,
++      amountRupees: p.amountRupees,
++      transactionId: p.transactionId,
++      paidAt: new Date(p.paidAt).toISOString(),
++    })),
++  };
++}
++
+ /**
+  * Every bill's payment summary for a restaurant, keyed by bill id, in three
+  * queries total. Lets server-rendered pages keep calling a synchronous
+diff --git a/src/server/modules/customer/actions.ts b/src/server/modules/customer/actions.ts
+index 04a9a57..c06e0ca 100644
+--- a/src/server/modules/customer/actions.ts
++++ b/src/server/modules/customer/actions.ts
+@@ -14,8 +14,10 @@ import { resolveCustomerTable } from "@/server/modules/tables/db-tables";
+ import {
+   getBillByOrderIdDb,
+   getBillPaymentSummaryDb,
++  getBillReceiptDb,
+   issueBillDb,
+   recordBillPaymentDb,
++  type BillReceipt,
+ } from "@/server/modules/billing/db-billing";
+ import { onBillPaymentConfirmed } from "@/server/modules/financial-pots/payment-hook";
+ 
+@@ -31,6 +33,10 @@ export type CustomerBillState = {
+   upiConfigured: boolean;
+   upiUri: string | null;
+   qrUrl: string | null;
++  /** Restaurant name for the receipt header. */
++  restaurantName: string;
++  /** Itemised receipt, read from PostgreSQL. */
++  receipt: BillReceipt;
+ };
+ 
+ export type CustomerOrderState =
+@@ -43,7 +49,8 @@ export type CustomerOrderState =
+ 
+ function buildBillState(
+   bill: Bill,
+-  summary: BillPaymentSummary
++  summary: BillPaymentSummary,
++  receipt: BillReceipt
+ ): CustomerBillState {
+   const upiUri = UPI_ID
+     ? `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(
+@@ -68,6 +75,8 @@ function buildBillState(
+     upiConfigured: Boolean(UPI_ID),
+     upiUri,
+     qrUrl,
++    restaurantName: RESTAURANT_NAME,
++    receipt,
+   };
+ }
+ 
+@@ -92,13 +101,17 @@ async function validateCustomerOrder(tableId: string, orderId: string) {
+   return { ok: true as const, table: resolution.table, order };
+ }
+ 
+-/** Bill + summary for an order, or null when it has not been billed yet. */
++/** Bill + summary + itemised receipt for an order, or null when not billed yet. */
+ async function loadBillState(orderId: string) {
+   const bill = await getBillByOrderIdDb(DEMO_RESTAURANT_ID, orderId);
+   if (!bill) return null;
+ 
+-  const summary = await getBillPaymentSummaryDb(DEMO_RESTAURANT_ID, bill.id);
+-  return summary ? { bill, summary } : null;
++  const [summary, receipt] = await Promise.all([
++    getBillPaymentSummaryDb(DEMO_RESTAURANT_ID, bill.id),
++    getBillReceiptDb(DEMO_RESTAURANT_ID, bill.id),
++  ]);
++
++  return summary && receipt ? { bill, summary, receipt } : null;
+ }
+ 
+ /**
+@@ -118,7 +131,7 @@ export async function getCustomerOrderState(
+     return {
+       ok: true,
+       orderStatus: validated.order.status,
+-      bill: state ? buildBillState(state.bill, state.summary) : null,
++      bill: state ? buildBillState(state.bill, state.summary, state.receipt) : null,
+     };
+   } catch (err) {
+     const failure = logDbError("getCustomerOrderState", err, {
+@@ -150,7 +163,7 @@ export async function generateCustomerBill(
+ 
+     const existing = await loadBillState(orderId);
+     if (existing) {
+-      return { ok: true, bill: buildBillState(existing.bill, existing.summary) };
++      return { ok: true, bill: buildBillState(existing.bill, existing.summary, existing.receipt) };
+     }
+ 
+     if (validated.order.status !== "served") {
+@@ -171,7 +184,7 @@ export async function generateCustomerBill(
+         case "already-billed": {
+           const state = await loadBillState(orderId);
+           if (state) {
+-            return { ok: true, bill: buildBillState(state.bill, state.summary) };
++            return { ok: true, bill: buildBillState(state.bill, state.summary, state.receipt) };
+           }
+           return { ok: false, error: "We could not generate the bill. Please ask your waiter." };
+         }
+@@ -192,7 +205,7 @@ export async function generateCustomerBill(
+       return { ok: false, error: "We could not generate the bill. Please ask your waiter." };
+     }
+ 
+-    return { ok: true, bill: buildBillState(state.bill, state.summary) };
++    return { ok: true, bill: buildBillState(state.bill, state.summary, state.receipt) };
+   } catch (err) {
+     const failure = logDbError("generateCustomerBill", err, {
+       restaurantId: DEMO_RESTAURANT_ID,
+@@ -234,10 +247,10 @@ export async function recordCustomerUpiPayment(
+       return { ok: false, error: "Generate your bill first." };
+     }
+ 
+-    const { bill, summary } = current;
++    const { bill, summary, receipt } = current;
+ 
+     if (summary.status === "paid" || summary.status === "refunded") {
+-      return { ok: true, bill: buildBillState(bill, summary) };
++      return { ok: true, bill: buildBillState(bill, summary, receipt) };
+     }
+ 
+     const cleanReference = transactionId.trim();
+@@ -262,7 +275,7 @@ export async function recordCustomerUpiPayment(
+         case "already-paid": {
+           const state = await loadBillState(orderId);
+           return state
+-            ? { ok: true, bill: buildBillState(state.bill, state.summary) }
++            ? { ok: true, bill: buildBillState(state.bill, state.summary, state.receipt) }
+             : { ok: false, error: "We could not record the payment. Please ask your waiter." };
+         }
+         case "overpayment":
+@@ -291,7 +304,12 @@ export async function recordCustomerUpiPayment(
+     revalidatePath("/owner/tables");
+     revalidatePath("/owner");
+ 
+-    return { ok: true, bill: buildBillState(result.bill, result.summary) };
++    const after = await loadBillState(orderId);
++    if (!after) {
++      return { ok: false, error: "Payment was recorded, but the bill could not be reloaded. Please refresh." };
++    }
++
++    return { ok: true, bill: buildBillState(after.bill, after.summary, after.receipt) };
+   } catch (err) {
+     const failure = logDbError("recordCustomerUpiPayment", err, {
+       restaurantId: DEMO_RESTAURANT_ID,
+diff --git a/src/server/modules/orders/db-orders.ts b/src/server/modules/orders/db-orders.ts
+index 4c61ed4..d0f71a8 100644
+--- a/src/server/modules/orders/db-orders.ts
++++ b/src/server/modules/orders/db-orders.ts
+@@ -243,6 +243,7 @@ export async function createOrderInDb(
+           categorySnapshot: item.category,
+           qty,
+           pricePaise: Math.round(effectiveRupees * 100),
++          lineTotalPaise: Math.round(effectiveRupees * 100) * qty,
+           basePricePaise: item.pricePaise,
+           discountPercent: item.discountPercent,
+           prepMinutes: item.prepMinutes,
+diff --git a/tests/db/receipt.test.ts b/tests/db/receipt.test.ts
+new file mode 100644
+index 0000000..d52fd56
+--- /dev/null
++++ b/tests/db/receipt.test.ts
+@@ -0,0 +1,182 @@
++/**
++ * Order → itemised bill → payments, against real PostgreSQL, through the same
++ * server actions the customer device calls. Run: TEST_DATABASE_URL=... npm run test:db
++ */
++import { beforeAll, describe, expect, it, vi } from "vitest";
++import { readFileSync } from "node:fs";
++
++vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
++
++const url = process.env.TEST_DATABASE_URL;
++const RID = "demo-restaurant";
++const REF = `UTR${Date.now()}Rcpt`;
++
++describe("payment popup source", () => {
++  it("no longer contains the Open UPI App button or a upi:// link", () => {
++    const src = readFileSync("src/components/customer/device/payment-panel.tsx", "utf8");
++    expect(src).not.toMatch(/Open UPI App/i);
++    expect(src).not.toMatch(/href=\{upiUri\}/);
++    expect(src).not.toMatch(/location\.href\s*=.*upi/i);
++    // QR + UPI id display are kept.
++    expect(src).toMatch(/QRCodeSVG/);
++    expect(src).toMatch(/UPI ID:/);
++  });
++});
++
++describe.skipIf(!url)("itemised bill from PostgreSQL", () => {
++  let orders: typeof import("@/server/modules/orders/db-orders");
++  let billing: typeof import("@/server/modules/billing/db-billing");
++  let customer: typeof import("@/server/modules/customer/actions");
++  let dbmod: typeof import("@/server/db/client");
++  let schema: typeof import("@/server/db/schema");
++  let eq: typeof import("drizzle-orm").eq;
++  let menu: { id: string; code: string; name: string }[];
++
++  beforeAll(async () => {
++    process.env.DATABASE_URL = url;
++    process.env.RESTAURANT_UPI_ID = "tablor@upi";
++    ({ eq } = await import("drizzle-orm"));
++    dbmod = await import("@/server/db/client");
++    schema = await import("@/server/db/schema");
++    orders = await import("@/server/modules/orders/db-orders");
++    billing = await import("@/server/modules/billing/db-billing");
++    customer = await import("@/server/modules/customer/actions");
++    const all = (await import("@/server/modules/demo-store/store")).getMenu();
++    menu = all.filter((m) => m.available && !m.discountPercent);
++  });
++
++  async function servedOrder(tableId: string) {
++    const lines = [
++      { code: menu[0].code, itemId: menu[0].id, qty: 1 },
++      { code: menu[1].code, itemId: menu[1].id, qty: 2 },
++      { code: menu[2].code, itemId: menu[2].id, qty: 3 },
++    ];
++    const placed = await orders.createOrderInDb({ restaurantId: RID, tableId, lines });
++    if (!placed.ok) throw new Error(placed.error);
++    for (let i = 0; i < 3; i += 1) await orders.transitionOrderInDb(RID, placed.orderId);
++    return placed.orderId;
++  }
++
++  it("persists line items with name, qty, unit price and line total", async () => {
++    const orderId = await servedOrder("t03");
++    const rows = await dbmod.db.select().from(schema.orderItems).where(eq(schema.orderItems.orderId, orderId));
++
++    expect(rows).toHaveLength(3);
++    for (const r of rows) {
++      expect(r.nameSnapshot.length).toBeGreaterThan(0);
++      expect(r.pricePaise).toBeGreaterThan(0);
++      expect(r.lineTotalPaise).toBe(r.qty * r.pricePaise);
++    }
++    const [o] = await dbmod.db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
++    expect(o.restaurantId).toBe(RID);
++    expect(o.tableId).toBe("t03");
++    expect(o.orderNumber).toBeGreaterThan(0);
++  });
++
++  it("generates an unpaid, itemised bill that survives a refresh; no duplicates", async () => {
++    const orderId = await servedOrder("t03");
++
++    const gen = await customer.generateCustomerBill("t03", orderId);
++    expect(gen.ok).toBe(true);
++    if (!gen.ok) return;
++    const r = gen.bill.receipt;
++
++    // Items from the DB, with correct arithmetic.
++    expect(r.lines.map((l) => l.qty).sort()).toEqual([1, 2, 3]);
++    for (const l of r.lines) expect(l.lineRupees).toBeCloseTo(l.qty * l.unitRupees, 2);
++    const sum = r.lines.reduce((s, l) => s + l.lineRupees, 0);
++    expect(r.subtotalRupees).toBeCloseTo(sum, 2);
++    expect(r.totalRupees).toBeCloseTo(
++      r.subtotalRupees + r.gstRupees + r.serviceChargeRupees - r.discountRupees, 2);
++
++    // Header facts.
++    expect(r.billNumber).toMatch(/^BILL-\d{3,}$/);
++    expect(r.orderNumber).toMatch(/^ORD-\d{3,}$/);
++    expect(r.tableLabel).toBe("Table 03");
++    expect(Number.isNaN(Date.parse(r.issuedAt))).toBe(false);
++
++    // Generating a bill never marks it paid.
++    expect(r.status).toBe("unpaid");
++    expect(r.paidRupees).toBe(0);
++    expect(r.remainingRupees).toBeCloseTo(r.totalRupees, 2);
++    expect(r.payments).toEqual([]);
++    const [b] = await dbmod.db.select().from(schema.bills).where(eq(schema.bills.orderId, orderId));
++    expect(b.paidAt).toBeNull();
++    expect(b.paymentMethod).toBeNull();
++    // QR is only a display string; showing it records nothing.
++    expect(gen.bill.upiUri).toContain("upi://pay");
++    expect(await billing.isOrderPaidDb(RID, orderId)).toBe(false);
++
++    // "Refresh": a fresh read returns the identical bill + items from Postgres.
++    const again = await customer.getCustomerOrderState("t03", orderId);
++    expect(again.ok && again.bill?.receipt).toEqual(r);
++
++    // Generating again returns the same bill; exactly one bill row exists.
++    const gen2 = await customer.generateCustomerBill("t03", orderId);
++    expect(gen2.ok && gen2.bill.billId).toBe(gen.bill.billId);
++    const all = await dbmod.db.select().from(schema.bills).where(eq(schema.bills.orderId, orderId));
++    expect(all).toHaveLength(1);
++  });
++
++  it("keeps total / paid / balance consistent through partial cash then full payment", async () => {
++    const orderId = await servedOrder("t02");
++    const gen = await customer.generateCustomerBill("t02", orderId);
++    if (!gen.ok) throw new Error(gen.error);
++    const { billId, totalRupees } = gen.bill;
++
++    const part = Math.floor(totalRupees / 2);
++    const p1 = await billing.recordBillPaymentDb(RID, billId, { method: "cash", amountRupees: part });
++    expect(p1.ok).toBe(true);
++
++    const mid = await customer.getCustomerOrderState("t02", orderId);
++    if (!mid.ok || !mid.bill) throw new Error("no state");
++    expect(mid.bill.receipt.status).toBe("partial");
++    expect(mid.bill.receipt.paidRupees).toBe(part);
++    expect(mid.bill.receipt.remainingRupees).toBeCloseTo(totalRupees - part, 2);
++    expect(mid.bill.receipt.payments).toMatchObject([{ method: "cash", amountRupees: part }]);
++    const [open] = await dbmod.db.select().from(schema.bills).where(eq(schema.bills.id, billId));
++    expect(open.paidAt).toBeNull(); // partially paid ≠ closed
++
++    const over = await billing.recordBillPaymentDb(RID, billId, { method: "cash", amountRupees: totalRupees });
++    expect(over).toMatchObject({ ok: false, reason: "overpayment" });
++
++    const p2 = await billing.recordBillPaymentDb(RID, billId, { method: "cash", amountRupees: totalRupees - part });
++    expect(p2.ok && p2.settled).toBe(true);
++
++    const done = await customer.getCustomerOrderState("t02", orderId);
++    expect(done.ok && done.bill?.receipt).toMatchObject({ status: "paid", remainingRupees: 0, paidRupees: totalRupees });
++    const [closed] = await dbmod.db.select().from(schema.bills).where(eq(schema.bills.id, billId));
++    expect(closed.paidAt).not.toBeNull();
++  });
++
++  it("shows the QR payment method and reference on the receipt, and rejects a duplicate payment reference", async () => {
++    const orderId = await servedOrder("t01");
++    const gen = await customer.generateCustomerBill("t01", orderId);
++    if (!gen.ok) throw new Error(gen.error);
++
++    const pay = await billing.recordBillPaymentDb(RID, gen.bill.billId, {
++      method: "qr", amountRupees: gen.bill.totalRupees, transactionId: REF,
++    });
++    expect(pay.ok).toBe(true);
++
++    const st = await customer.getCustomerOrderState("t01", orderId);
++    if (!st.ok || !st.bill) throw new Error("no state");
++    expect(st.bill.receipt.status).toBe("paid");
++    expect(st.bill.receipt.payments).toMatchObject([{ method: "qr", transactionId: REF }]);
++
++    // Same reference on another bill is refused.
++    const order2 = await servedOrder("t04");
++    const gen2 = await customer.generateCustomerBill("t04", order2);
++    if (!gen2.ok) throw new Error(gen2.error);
++    const dup = await billing.recordBillPaymentDb(RID, gen2.bill.billId, {
++      method: "qr", amountRupees: gen2.bill.totalRupees, transactionId: REF.toUpperCase(),
++    });
++    expect(dup).toMatchObject({ ok: false, reason: "duplicate-reference" });
++  });
++
++  it("customer action for another table cannot read this order's bill", async () => {
++    const orderId = await servedOrder("t05");
++    const wrong = await customer.getCustomerOrderState("t06", orderId);
++    expect(wrong).toMatchObject({ ok: false });
++  });
++});
+diff --git a/tests/payment-panel.test.ts b/tests/payment-panel.test.ts
+new file mode 100644
+index 0000000..2fa38e2
+--- /dev/null
++++ b/tests/payment-panel.test.ts
+@@ -0,0 +1,75 @@
++import { createElement } from "react";
++import { renderToStaticMarkup } from "react-dom/server";
++import { describe, expect, it } from "vitest";
++import { PaymentPanel } from "@/components/customer/device/payment-panel";
++import type { CustomerBillState } from "@/server/modules/customer/actions";
++
++function state(over: Partial<CustomerBillState["receipt"]> = {}): CustomerBillState {
++  const receipt = {
++    billNumber: "BILL-007",
++    orderNumber: "ORD-012",
++    issuedAt: "2026-10-17T10:30:00.000Z",
++    tableLabel: "Table 05",
++    lines: [
++      { name: "Fish Fingers", qty: 1, unitRupees: 250, lineRupees: 250 },
++      { name: "Butter Naan", qty: 2, unitRupees: 40, lineRupees: 80 },
++    ],
++    subtotalRupees: 330,
++    gstRupees: 17,
++    serviceChargeRupees: 0,
++    discountRupees: 0,
++    totalRupees: 347,
++    paidRupees: 0,
++    remainingRupees: 347,
++    status: "unpaid" as const,
++    payments: [],
++    ...over,
++  };
++  return {
++    billId: "uuid-should-not-be-shown",
++    totalRupees: receipt.totalRupees,
++    paidRupees: receipt.paidRupees,
++    remainingRupees: receipt.remainingRupees,
++    status: receipt.status,
++    upiConfigured: true,
++    upiUri: "upi://pay?pa=tablor%40upi&pn=Tablor&am=347&cu=INR",
++    qrUrl: null,
++    restaurantName: "Tablor's",
++    receipt,
++  };
++}
++
++const render = (bill: CustomerBillState, mode: "bill" | "qr") =>
++  renderToStaticMarkup(createElement(PaymentPanel, { bill, mode, onClose: () => {} }));
++
++describe("PaymentPanel", () => {
++  it("bill popup lists items, totals, and Pending status", () => {
++    const html = render(state(), "bill");
++    for (const t of ["BILL-007", "ORD-012", "Table 05", "Fish Fingers", "Butter Naan", "₹250", "₹80",
++      "Subtotal", "₹330", "GST", "₹17", "₹347", "Balance Due", "Payment Status: Pending"]) {
++      expect(html).toContain(t);
++    }
++    expect(html).not.toContain("uuid-should-not-be-shown");
++    expect(html).not.toContain("Open UPI App");
++  });
++
++  it("shows partial and paid statuses with payment method and reference", () => {
++    const partial = render(state({ status: "partial", paidRupees: 100, remainingRupees: 247,
++      payments: [{ method: "cash", amountRupees: 100, transactionId: null, paidAt: "2026-10-17T10:40:00.000Z" }] }), "bill");
++    expect(partial).toContain("Payment Status: Partially Paid");
++    expect(partial).toContain("Cash");
++
++    const paid = render(state({ status: "paid", paidRupees: 347, remainingRupees: 0,
++      payments: [{ method: "qr", amountRupees: 347, transactionId: "UTR123456789", paidAt: "2026-10-17T10:40:00.000Z" }] }), "bill");
++    expect(paid).toContain("Payment Status: Paid");
++    expect(paid).toContain("Ref UTR123456789");
++  });
++
++  it("QR popup keeps the QR and UPI id but has no Open UPI App button or upi:// link", () => {
++    const html = render(state(), "qr");
++    expect(html).toContain("<svg");              // QR code still rendered
++    expect(html).toContain("UPI ID: tablor@upi"); // UPI id still shown
++    expect(html).not.toContain("Open UPI App");
++    expect(html).not.toMatch(/<a[^>]+href="upi:/);
++  });
++});
+-- 
+2.43.0

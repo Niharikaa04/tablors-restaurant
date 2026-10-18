@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { DayPicker } from "@/components/ui/day-picker";
+import { istDay, resolveDay, todayIst, yesterdayIst } from "@/lib/day";
 
 import { LiveRefresh } from "@/components/live/live-refresh";
 import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
@@ -7,13 +9,13 @@ import {
   acknowledgeWaiter,
   advanceOrderFromForm,
 } from "@/server/modules/orders/actions";
-import { listActiveOrders, listTables } from "@/server/modules/orders/db-orders";
+import { listAllOrders, listTables } from "@/server/modules/orders/db-orders";
 
 // Orders change constantly — never prerender.
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  searchParams: Promise<{ notice?: string }>;
+  searchParams: Promise<{ notice?: string; date?: string }>;
 };
 
 function getStatusLabel(status: string): string {
@@ -35,8 +37,9 @@ function getStatusLabel(status: string): string {
 
 function getNextActionLabel(status: string): string | null {
   switch (status) {
+    // Dine-in: the owner only has two actions, Mark Ready and Mark Served.
+    // Marking a new order ready passes through Preparing automatically.
     case "new":
-      return "Accept Order";
     case "preparing":
       return "Mark Ready";
     case "ready":
@@ -82,8 +85,17 @@ function formatElapsed(fromMs: number): string {
   return rest === 0 ? `${hours} h ago` : `${hours} h ${rest} min ago`;
 }
 
+function formatPlacedAt(ms: number): string {
+  return new Date(ms).toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Asia/Kolkata",
+  });
+}
+
 export default async function LiveOrdersPage({ searchParams }: PageProps) {
-  const { notice } = await searchParams;
+  const { notice, date } = await searchParams;
   const noticeMessage = getNoticeMessage(
     typeof notice === "string" ? notice : undefined
   );
@@ -93,7 +105,7 @@ export default async function LiveOrdersPage({ searchParams }: PageProps) {
 
   try {
     [orders, tables] = await Promise.all([
-      listActiveOrders(DEMO_RESTAURANT_ID),
+      listAllOrders(DEMO_RESTAURANT_ID),
       listTables(DEMO_RESTAURANT_ID),
     ]);
   } catch (err) {
@@ -117,6 +129,15 @@ export default async function LiveOrdersPage({ searchParams }: PageProps) {
 
   const waiterCalls = tables.filter((t) => t.waiterCalled);
 
+  const today = todayIst();
+  const selectedDay = resolveDay(date);
+  const isToday = selectedDay === today;
+
+  // Cancelled orders never appear in the live flow.
+  const dayOrders = orders
+    .filter((o) => (o.status as string) !== "cancelled" && istDay(o.createdAt) === selectedDay)
+    .sort((a, b) => a.createdAt - b.createdAt);
+
   return (
     <div>
       <LiveRefresh />
@@ -124,6 +145,8 @@ export default async function LiveOrdersPage({ searchParams }: PageProps) {
       <h1 className="text-2xl text-[var(--color-text-primary)]">
         Live orders
       </h1>
+
+      <DayPicker value={selectedDay} today={today} yesterday={yesterdayIst()} />
 
       {noticeMessage && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-brand)] border border-[var(--color-warning)] bg-[var(--color-warning)]/10 px-4 py-3">
@@ -162,15 +185,16 @@ export default async function LiveOrdersPage({ searchParams }: PageProps) {
       )}
 
       <div className="mt-6 space-y-4">
-        {orders.length === 0 && (
+        {dayOrders.length === 0 && (
           <p className="text-sm text-[var(--color-text-muted)]">
-            No active orders right now.
+            {isToday ? "No orders yet today." : "No orders on this day."}
           </p>
         )}
 
-        {orders.map((order) => {
+        {dayOrders.map((order) => {
           const table = tables.find((t) => t.id === order.tableId);
-          const action = getNextActionLabel(order.status);
+          // Only today's orders can still be moved forward; past days are history.
+          const action = isToday ? getNextActionLabel(order.status) : null;
 
           const total = order.lines.reduce(
             (sum, line) => sum + line.qty * line.priceRupees,
@@ -199,7 +223,7 @@ export default async function LiveOrdersPage({ searchParams }: PageProps) {
                   </p>
 
                   <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                    Placed {formatElapsed(order.createdAt)}
+                    Placed {isToday ? formatElapsed(order.createdAt) : formatPlacedAt(order.createdAt)}
                     {order.status !== "new" &&
                       ` · ${getStatusLabel(order.status)} ${formatElapsed(order.statusUpdatedAt)}`}
                   </p>

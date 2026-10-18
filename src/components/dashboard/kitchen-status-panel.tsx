@@ -1,13 +1,17 @@
 import { AlertTriangle, ChefHat, CheckCircle2, Clock } from "lucide-react";
-import { getSlowActiveOrders, getTodayOverview } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import {
+  getSlowActiveOrdersDb,
+  getTodayOverviewDb,
+} from "@/server/modules/data/analytics-db";
 import { runNotificationSweep } from "@/server/modules/notifications/sweep";
 import { SectionHeader } from "./section-header";
 
-export function KitchenStatusPanel() {
+export async function KitchenStatusPanel() {
   runNotificationSweep();
 
-  const overview = getTodayOverview();
-  const slowOrders = getSlowActiveOrders();
+  const overview = await getTodayOverviewDb(DEMO_RESTAURANT_ID);
+  const slowOrders = await getSlowActiveOrdersDb(DEMO_RESTAURANT_ID);
 
   const rows = [
     { label: "New", value: overview.newOrders, icon: Clock },

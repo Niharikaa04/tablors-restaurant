@@ -25,7 +25,6 @@ import {
   getBills,
   getPayments,
 } from "@/server/modules/demo-store/store";
-import { listTodayReservations } from "@/server/modules/demo-store/reservations";
 import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
 
 const restaurantId = DEMO_RESTAURANT_ID;
@@ -37,7 +36,12 @@ async function main() {
   const ordersData = getOrders();
   const billsData = getBills();
   const paymentsData = getPayments();
-  const reservationsData = listTodayReservations(restaurantId);
+  // Demo reservations are no longer fabricated; real ones live in Postgres.
+  const reservationsData: {
+    id: string; tableId: string; guestName: string; phone: string;
+    partySize: number; reservedFor: number; status: "booked" | "checked_in" | "cancelled";
+    createdAt: number; updatedAt: number;
+  }[] = [];
 
   // Create the restaurant if it does not already exist.
   await db

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BatteryLow, Bell, Ban, CalendarCheck, Clock, IndianRupee, ShoppingBag, UtensilsCrossed, WifiOff, type LucideIcon } from "lucide-react";
+import { BatteryLow, Bell, Ban, CalendarCheck, Clock, Gift, IndianRupee, ShoppingBag, Tag, UtensilsCrossed, WifiOff, type LucideIcon } from "lucide-react";
 
 interface Item { id: string; type: string; title: string; message: string; at: string; severity: "info" | "warning" | "critical"; href: string; read: boolean }
 
@@ -10,6 +10,7 @@ const COLOR: Record<Item["severity"], string> = { info: "text-zinc-400", warning
 const ICON: Record<string, LucideIcon> = {
   order_new: ShoppingBag, payment_received: IndianRupee, item_unavailable: UtensilsCrossed, table_reserved: CalendarCheck,
   order_cancelled: Ban, device_offline: WifiOff, device_low_battery: BatteryLow, kitchen_order_delayed: Clock,
+  offer_created: Tag, loyalty_points_earned: Gift,
 };
 const POLL_MS = 30_000;
 

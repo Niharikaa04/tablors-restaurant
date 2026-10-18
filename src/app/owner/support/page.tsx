@@ -1,15 +1,18 @@
 import { requirePermission } from "@/server/modules/auth/session";
 import { listTickets } from "@/server/modules/demo-store/support";
-import { getDevices, getTables } from "@/server/modules/demo-store/store";
+import { getDevicesDb } from "@/server/modules/data/devices-db";
+import { getTablesDb } from "@/server/modules/data/tables-db";
 import { SupportManager, type TicketRow } from "./support-manager";
 
 const fmt = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
 
 export default async function SupportPage() {
   const session = await requirePermission("support");
-  const tables = getTables();
+  const tables = await getTablesDb(session.restaurantId);
+  const ticketList = await listTickets(session.restaurantId);
+  const deviceList = await getDevicesDb(session.restaurantId);
 
-  const tickets: TicketRow[] = listTickets(session.restaurantId).map((t) => ({
+  const tickets: TicketRow[] = ticketList.map((t) => ({
     id: t.id,
     type: t.type,
     subject: t.subject,
@@ -20,7 +23,7 @@ export default async function SupportPage() {
   }));
 
   // Device dropdown. If your Device type has different field names, adjust here.
-  const deviceOptions = getDevices().map((d) => {
+  const deviceOptions = deviceList.map((d) => {
     const dev = d as unknown as { id: string; tableId?: string; label?: string };
     const table = tables.find((t) => t.id === dev.tableId);
     return { id: dev.id, label: dev.label ?? table?.label ?? dev.id };

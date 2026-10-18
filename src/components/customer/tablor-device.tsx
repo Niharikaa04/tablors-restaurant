@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 import type { MenuItem } from "@/server/modules/demo-store/store";
@@ -9,6 +9,7 @@ import { MenuPane } from "./device/menu-pane";
 import { KeypadPanel } from "./device/keypad-panel";
 import { OrderPanel } from "./device/order-panel";
 import { PaymentPanel } from "./device/payment-panel";
+import { OrderCompletedPanel } from "./order-completed-panel";
 
 import {
   callWaiter,
@@ -19,13 +20,16 @@ import {
   generateCustomerBill,
   getCustomerOrderState,
   recordCustomerUpiPayment,
+  identifyLoyaltyMember,
+  redeemLoyaltyReward,
+  removeLoyaltyReward,
   type CustomerBillState,
 } from "@/server/modules/customer/actions";
 
 const MAX_QTY = 99;
 const MAX_CODE_LEN = 4;
 const MENU_REFRESH_MS = 10_000;
-const PAYMENT_REFRESH_MS = 3_000;
+const PAYMENT_REFRESH_MS = 2_000;
 
 export function TablorDevice({
   tableId,
@@ -72,6 +76,16 @@ export function TablorDevice({
 
   const [generatingBill, setGeneratingBill] = useState(false);
   const [confirmingUpi, setConfirmingUpi] = useState(false);
+  const confirmInFlight = useRef(false);
+
+  // Menu pages (one category per page), driven by the keypad ▲ ▼ arrows and
+  // the keyboard ArrowUp/ArrowDown keys. Wraps around, so never disabled.
+  const [menuPage, setMenuPage] = useState(0);
+  const menuPageCount = Math.max(new Set(items.map((i) => i.category)).size, 1);
+
+  function stepMenuPage(delta: number) {
+    setMenuPage((prev) => (prev + delta + menuPageCount) % menuPageCount);
+  }
 
   const selectedItem =
     items.find((item) => item.code === selectedCode) ?? null;
@@ -101,6 +115,8 @@ export function TablorDevice({
 
       setBill(state.bill);
 
+      // The completed/feedback view is rendered right away from this state;
+      // the refresh only brings the server-rendered page in line afterwards.
       if (state.bill?.status === "paid") {
         router.refresh();
       }
@@ -234,6 +250,24 @@ export function TablorDevice({
     setQtyTyped(false);
   }
 
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+
+      event.preventDefault();
+      setMenuPage((prev) =>
+        (prev + (event.key === "ArrowUp" ? -1 : 1) + menuPageCount) % menuPageCount
+      );
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [menuPageCount]);
+
   function handleQtyPlus() {
     if (!selectedItem) {
       return;
@@ -365,20 +399,27 @@ export function TablorDevice({
   }
 
   async function handleConfirmUpi(transactionId: string) {
-    if (!lastOrderId) {
+    // The ref blocks a second click in the same tick, before state re-renders.
+    if (!lastOrderId || confirmInFlight.current) {
       return;
     }
 
+    confirmInFlight.current = true;
     setConfirmingUpi(true);
     setConfirmError(null);
 
-    const result = await recordCustomerUpiPayment(
-      tableId,
-      lastOrderId,
-      transactionId
-    );
+    let result: Awaited<ReturnType<typeof recordCustomerUpiPayment>>;
 
-    setConfirmingUpi(false);
+    try {
+      result = await recordCustomerUpiPayment(
+        tableId,
+        lastOrderId,
+        transactionId
+      );
+    } finally {
+      confirmInFlight.current = false;
+      setConfirmingUpi(false);
+    }
 
     if (!result.ok) {
       setConfirmError(result.error);
@@ -402,6 +443,42 @@ export function TablorDevice({
 
     setInfoMessage(
       "Feedback becomes available after your bill is fully paid."
+    );
+  }
+
+  // Loyalty: each call returns the refreshed bill (new total after a reward).
+  const loyaltyHandlers = {
+    async identify(phone: string) {
+      if (!lastOrderId) return { ok: false, message: "Generate the bill first." };
+      const res = await identifyLoyaltyMember(tableId, lastOrderId, phone);
+      if (res.bill) setBill(res.bill);
+      return res.ok ? { ok: true } : { ok: false, message: res.message };
+    },
+    async redeem(rewardId: string) {
+      if (!lastOrderId) return { ok: false, message: "Generate the bill first." };
+      const res = await redeemLoyaltyReward(tableId, lastOrderId, rewardId);
+      if (res.bill) setBill(res.bill);
+      return res.ok ? { ok: true } : { ok: false, message: res.message };
+    },
+    async remove() {
+      if (!lastOrderId) return { ok: false, message: "Generate the bill first." };
+      const res = await removeLoyaltyReward(tableId, lastOrderId);
+      if (res.bill) setBill(res.bill);
+      return res.ok ? { ok: true } : { ok: false, message: res.message };
+    },
+  };
+
+  // Show the thank-you + feedback form the moment the bill is paid, without
+  // waiting for a full server re-render of the page.
+  if (bill?.status === "paid" && lastOrderId) {
+    return (
+      <div className="mt-2">
+        <OrderCompletedPanel
+          orderId={lastOrderId}
+          tableId={tableId}
+          feedbackSubmitted={false}
+        />
+      </div>
     );
   }
 
@@ -440,6 +517,7 @@ export function TablorDevice({
         selectedCode={selectedCode}
         onSelectItem={() => {}}
         getQty={cart.getQty}
+        pageIndex={menuPage}
       />
 
       {lastOrderId && cart.lines.length === 0 && (
@@ -513,6 +591,8 @@ export function TablorDevice({
           onCallWaiter={handleCallWaiter}
           waiterCalling={waiterCalling}
           onFeedback={handleFeedback}
+          onArrowUp={() => stepMenuPage(-1)}
+          onArrowDown={() => stepMenuPage(1)}
         />
 
         <OrderPanel
@@ -532,6 +612,7 @@ export function TablorDevice({
           generatingBill={generatingBill}
           onConfirmUpi={handleConfirmUpi}
           confirmingUpi={confirmingUpi}
+          loyalty={loyaltyHandlers}
         />
       )}
     </div>

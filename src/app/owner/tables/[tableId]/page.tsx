@@ -5,10 +5,11 @@ import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { hasPermission } from "@/server/modules/auth/permissions";
 import { getDemoRole } from "@/server/modules/auth/session";
 import { formatAgo } from "@/server/modules/demo-store/device-telemetry";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getDevicesDb } from "@/server/modules/data/devices-db";
+import { getTablesDb } from "@/server/modules/data/tables-db";
+import { listActiveOrders } from "@/server/modules/orders/db-orders";
 import {
-  getDevices,
-  getOrders,
-  getTables,
   type Order,
   type RestaurantTable,
 } from "@/server/modules/demo-store/store";
@@ -155,8 +156,8 @@ export default async function TableDetailsPage({
 
   const canSeeDevices = hasPermission(await getDemoRole(), "devices");
 
-  const tables = getTables();
-  const orders = getOrders();
+  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
+  const orders = await listActiveOrders(DEMO_RESTAURANT_ID);
 
   const table = tables.find(
     (currentTable: RestaurantTable) => currentTable.id === tableId
@@ -166,7 +167,7 @@ export default async function TableDetailsPage({
     notFound();
   }
 
-  const device = getDevices().find((d) => d.tableId === table.id) ?? null;
+  const device = (await getDevicesDb(DEMO_RESTAURANT_ID)).find((d) => d.tableId === table.id) ?? null;
   const hasBattery = device !== null && Number.isFinite(device.batteryPercent);
 
   const order = table.currentOrderId

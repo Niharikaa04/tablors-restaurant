@@ -1,8 +1,7 @@
-import {
-
-  getMenu,
-
-} from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { LiveRefresh } from "@/components/live/live-refresh";
+import { getMenuDb } from "@/server/modules/data/menu-db";
+import type { Offer } from "@/server/modules/offers/store";
 
 
 
@@ -89,7 +88,7 @@ function offerTypeLabel(type: string) {
 
 
 
-function targetLabel(offer: ReturnType<typeof getOffers>[number]) {
+function targetLabel(offer: Offer, menu: Awaited<ReturnType<typeof getMenuDb>>) {
 
   if (offer.targetType === "order") {
 
@@ -107,7 +106,7 @@ function targetLabel(offer: ReturnType<typeof getOffers>[number]) {
 
 
 
-  const item = getMenu().find(
+  const item = menu.find(
 
     (menuItem) => menuItem.id === offer.targetItemId
 
@@ -123,7 +122,7 @@ function targetLabel(offer: ReturnType<typeof getOffers>[number]) {
 
 function offerValueLabel(
 
-  offer: ReturnType<typeof getOffers>[number]
+  offer: Offer
 
 ) {
 
@@ -153,9 +152,9 @@ export default async function OffersPage() {
 
   const now = await getOffersPageNow();
 
-  const offers = getOffers();
+  const offers = await getOffers();
 
-  const menu = getMenu();
+  const menu = await getMenuDb(DEMO_RESTAURANT_ID);
 
 
 
@@ -170,6 +169,7 @@ export default async function OffersPage() {
   return (
 
     <main className="min-h-screen bg-[#0D0E0B] px-4 py-8 text-[#F2F3EC] md:px-8">
+      <LiveRefresh intervalMs={10000} />
 
       <div className="mx-auto max-w-7xl">
 
@@ -1007,7 +1007,7 @@ export default async function OffersPage() {
 
                               <p className="mt-1 font-medium">
 
-                                {targetLabel(offer)}
+                                {targetLabel(offer, menu)}
 
                               </p>
 

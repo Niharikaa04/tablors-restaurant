@@ -1,5 +1,7 @@
 import { BatteryFull, BatteryLow, BatteryMedium, WifiOff } from "lucide-react";
-import { getDevices, getTables } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getDevicesDb } from "@/server/modules/data/devices-db";
+import { getTablesDb } from "@/server/modules/data/tables-db";
 import { SectionHeader } from "./section-header";
 
 function batteryIcon(percent: number) {
@@ -8,9 +10,9 @@ function batteryIcon(percent: number) {
   return BatteryLow;
 }
 
-export function DeviceHealthPanel() {
-  const devices = getDevices();
-  const tables = getTables();
+export async function DeviceHealthPanel() {
+  const devices = await getDevicesDb(DEMO_RESTAURANT_ID);
+  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
   const offline = devices.filter((d) => !d.online).length;
 
   return (

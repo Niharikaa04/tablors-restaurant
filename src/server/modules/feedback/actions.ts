@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getBillByOrderId, getOrder } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getBillByOrderIdDb } from "@/server/modules/billing/db-billing";
+import { getOrderFromDb } from "@/server/modules/orders/db-orders";
 import { getFeedbackByOrderId, submitFeedback } from "@/server/modules/feedback/store";
 
 export type SubmitFeedbackInput = {
@@ -32,17 +34,17 @@ function isValidRating(n: number) {
 export async function submitCustomerFeedback(
   input: SubmitFeedbackInput
 ): Promise<SubmitFeedbackResult> {
-  const order = getOrder(input.orderId);
+  const order = await getOrderFromDb(DEMO_RESTAURANT_ID, input.orderId);
   if (!order || order.tableId !== input.tableId) {
     return { ok: false, error: "Order not found for this table." };
   }
 
-  const bill = getBillByOrderId(input.orderId);
+  const bill = await getBillByOrderIdDb(DEMO_RESTAURANT_ID, input.orderId);
   if (!bill || !bill.paymentMethod || !bill.paidAt) {
     return { ok: false, error: "This order isn't marked as paid yet." };
   }
 
-  if (getFeedbackByOrderId(input.orderId)) {
+  if (await getFeedbackByOrderId(input.orderId)) {
     return { ok: false, error: "Feedback has already been submitted for this order." };
   }
 
@@ -54,7 +56,7 @@ export async function submitCustomerFeedback(
     return { ok: false, error: "Please rate all three categories (1-5 stars)." };
   }
 
-  submitFeedback({
+  await submitFeedback({
     orderId: input.orderId,
     tableId: input.tableId,
     foodRating: input.foodRating,

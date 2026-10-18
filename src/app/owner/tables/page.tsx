@@ -2,15 +2,17 @@ import Link from "next/link";
 
 import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { hasPermission } from "@/server/modules/auth/permissions";
-import { getDemoRole, getDemoSession } from "@/server/modules/auth/session";
-import { formatAgo } from "@/server/modules/demo-store/device-telemetry";
 import {
-  formatTimeLabel,
-  listTodayReservations,
-} from "@/server/modules/demo-store/reservations";
+  DEMO_RESTAURANT_ID,
+  getDemoRole,
+  getDemoSession,
+} from "@/server/modules/auth/session";
+import { getDevicesDb } from "@/server/modules/data/devices-db";
+import { listTodayReservationsDb } from "@/server/modules/data/reservations-db";
+import { formatAgo } from "@/server/modules/demo-store/device-telemetry";
+import { formatTimeLabel } from "@/server/modules/demo-store/reservations";
 import {
   RESTAURANT_TIME_ZONE,
-  getDevices,
   type Device,
   type RestaurantTable,
 } from "@/server/modules/demo-store/store";
@@ -494,16 +496,20 @@ export default async function TablesAndDevicesPage({
     activeFilter = "all";
   }
 
-  const activities = getTableActivities();
-  const devices = getDevices();
+  const activities = await getTableActivities(DEMO_RESTAURANT_ID);
+  const devices = await getDevicesDb(DEMO_RESTAURANT_ID);
   const tables = activities.map((a) => a.table);
   const visibleActivities = activities.filter((a) =>
     matchesFilter(a, activeFilter),
   );
 
+  const todaysReservations =
+    canReserve && session
+      ? await listTodayReservationsDb(session.restaurantId)
+      : [];
   const reservationRows: ReservationRow[] =
     canReserve && session
-      ? listTodayReservations(session.restaurantId).map((r) => {
+      ? todaysReservations.map((r) => {
           const table = tables.find((t) => t.id === r.tableId);
           return {
             id: r.id,

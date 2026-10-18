@@ -10,10 +10,12 @@ const TYPE_MAP = {
   DEVICE_OFFLINE: "device_offline",
   DEVICE_LOW_BATTERY: "device_low_battery",
   KITCHEN_ORDER_DELAYED: "kitchen_order_delayed",
+  OFFER_CREATED: "offer_created",
+  LOYALTY_POINTS_EARNED: "loyalty_points_earned",
 } as const;
 
 setNotificationLoader(async () => {
-  const notifications = listFor("owner", null);
+  const notifications = await listFor("owner", null);
 
   return notifications.map((n) => ({
     id: n.id,

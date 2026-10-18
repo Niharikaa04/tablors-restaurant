@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { hasPermission } from "@/server/modules/auth/permissions";
 import { getDemoSession } from "@/server/modules/auth/session";
-import { getDevices } from "@/server/modules/demo-store/store";
+import { getDevicesDb } from "@/server/modules/data/devices-db";
 import { addDevices, changePlan, renew } from "@/server/modules/demo-store/subscription";
 
 export type SubscriptionActionResult = { ok: true } | { ok: false; error: string };
@@ -26,14 +26,18 @@ export async function changePlanAction(plan: unknown): Promise<SubscriptionActio
   if (!session) return fail("Only the owner can change the subscription.");
   const p = z.enum(["starter", "professional", "enterprise"]).safeParse(plan);
   if (!p.success) return fail("Invalid plan.");
-  const err = changePlan(session.restaurantId, p.data, getDevices().length);
+  const err = await changePlan(
+    session.restaurantId,
+    p.data,
+    (await getDevicesDb(session.restaurantId)).length,
+  );
   return err ? fail(err) : done();
 }
 
 export async function renewAction(): Promise<SubscriptionActionResult> {
   const session = await authorize();
   if (!session) return fail("Only the owner can renew.");
-  renew(session.restaurantId);
+  await renew(session.restaurantId);
   return done();
 }
 
@@ -42,6 +46,6 @@ export async function addDevicesAction(count: unknown): Promise<SubscriptionActi
   if (!session) return fail("Only the owner can add devices.");
   const p = z.coerce.number().int().min(1, "Enter at least 1").max(100).safeParse(count);
   if (!p.success) return fail(p.error.issues[0]?.message ?? "Invalid number");
-  addDevices(session.restaurantId, p.data);
+  await addDevices(session.restaurantId, p.data);
   return done();
 }

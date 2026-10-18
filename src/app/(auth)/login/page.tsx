@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import Link from "next/link";
+import { TablorLogo } from "@/components/brand/tablor-logo";
 import { demoLogin, type DemoLoginState } from "@/server/modules/auth/demo-actions";
 
 const initialState: DemoLoginState = { status: "idle" };
@@ -22,17 +22,12 @@ function SubmitButton() {
 
 export default function LoginPage() {
   const [state, formAction] = useActionState(demoLogin, initialState);
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--color-surface-0)] px-6">
       <div className="w-full max-w-sm rounded-[var(--radius-brand)] border border-[var(--color-border)] bg-[var(--color-surface-1)] p-8">
-        <Link
-          href="/"
-          className="text-lg text-[var(--color-gold-400)]"
-          style={{ fontFamily: "ui-serif, Georgia, 'Times New Roman', serif" }}
-        >
-          Tablor&apos;s
-        </Link>
+        <TablorLogo size="lg" href="/" priority />
         <h1 className="mt-4 text-xl text-[var(--color-text-primary)]">Sign in</h1>
 
         <form action={formAction} className="mt-6 space-y-4">
@@ -52,13 +47,41 @@ export default function LoginPage() {
             <label htmlFor="password" className="text-sm text-[var(--color-text-secondary)]">
               Password
             </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              className="mt-1.5 w-full rounded-[var(--radius-brand)] border border-[var(--color-border)] bg-[var(--color-surface-0)] px-4 py-2.5 text-sm text-[var(--color-text-primary)] outline-none focus-visible:border-[var(--color-gold-500)]"
-            />
+            <div className="mt-1.5" style={{ position: "relative" }}>
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                style={{ display: "block", width: "100%", boxSizing: "border-box", paddingRight: "3rem" }}
+                className="rounded-[var(--radius-brand)] border border-[var(--color-border)] bg-[var(--color-surface-0)] py-2.5 pl-4 text-sm text-[var(--color-text-primary)] outline-none focus-visible:border-[var(--color-gold-500)]"
+              />
+              {/* Inside the box, right edge: 👁️ = show the password, 🙈 = hide it again. */}
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-pressed={showPassword}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                title={showPassword ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  right: "0.75rem",
+                  display: "flex",
+                  alignItems: "center",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  fontSize: "1.15rem",
+                  lineHeight: 1,
+                }}
+              >
+                <span aria-hidden="true">{showPassword ? "🙈" : "👁️"}</span>
+              </button>
+            </div>
           </div>
 
           {state.status === "error" && (
@@ -69,13 +92,6 @@ export default function LoginPage() {
 
           <SubmitButton />
         </form>
-
-        <div className="mt-6 rounded-[var(--radius-brand)] border border-[var(--color-border)] bg-[var(--color-surface-0)] p-4 text-xs text-[var(--color-text-muted)]">
-          <p className="text-[var(--color-text-secondary)]">Demo credentials</p>
-          <p className="mt-1">Owner: owner / demo-owner</p>
-          <p>Kitchen: kitchen / demo-kitchen</p>
-          <p>Admin: admin / demo-admin</p>
-        </div>
       </div>
     </div>
   );

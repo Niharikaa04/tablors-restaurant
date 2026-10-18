@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm";
 
 import { db } from "@/server/db/client";
+import { buildReceipt, type BillReceipt } from "./receipt";
 
 import {
   bills,
@@ -68,6 +69,7 @@ function toBill(b: BillRow): Bill {
     totalRupees: b.totalPaise / 100,
     paymentMethod: b.paymentMethod,
     paidAt: b.paidAt ? b.paidAt.getTime() : null,
+    createdAt: b.createdAt.getTime(),
   };
 }
 
@@ -99,7 +101,15 @@ function toRefund(r: RefundRow): Refund {
 async function summaryFor(exec: Exec, bill: Bill): Promise<BillPaymentSummary> {
   const payRows = await exec.select().from(payments).where(eq(payments.billId, bill.id));
   const refRows = await exec.select().from(refunds).where(eq(refunds.billId, bill.id));
+  return buildSummary(bill, payRows, refRows);
+}
 
+function buildSummary(
+  bill: Bill,
+  payRows: PaymentRow[],
+  refRows: RefundRow[],
+): BillPaymentSummary {
+  payRows = [...payRows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   const billPayments = payRows.map((p) => toPayment(p, bill));
   const billRefunds = refRows.map(toRefund);
 
@@ -151,6 +161,48 @@ export async function getBillByOrderIdDb(
     .from(bills)
     .where(and(eq(bills.orderId, orderId), eq(bills.restaurantId, restaurantId)));
   return row ? toBill(row) : null;
+}
+
+/** All payments for the restaurant, oldest first, in the existing UI shape. */
+export async function listPaymentsDb(restaurantId: string): Promise<Payment[]> {
+  const rows = await db
+    .select({ p: payments, b: { orderId: bills.orderId, tableId: bills.tableId } })
+    .from(payments)
+    .innerJoin(bills, eq(bills.id, payments.billId))
+    .where(eq(payments.restaurantId, restaurantId))
+    .orderBy(payments.createdAt);
+  return rows.map((r) => toPayment(r.p, r.b));
+}
+
+export async function listRefundsDb(restaurantId: string): Promise<Refund[]> {
+  const rows = await db
+    .select()
+    .from(refunds)
+    .where(eq(refunds.restaurantId, restaurantId))
+    .orderBy(refunds.createdAt);
+  return rows.map(toRefund);
+}
+
+/** Payment summaries for many bills using two queries (no N+1). */
+export async function getBillSummariesDb(
+  restaurantId: string,
+  billList: Bill[],
+): Promise<Map<string, BillPaymentSummary>> {
+  const payRows = await db.select().from(payments).where(eq(payments.restaurantId, restaurantId));
+  const refRows = await db.select().from(refunds).where(eq(refunds.restaurantId, restaurantId));
+
+  const result = new Map<string, BillPaymentSummary>();
+  for (const bill of billList) {
+    result.set(
+      bill.id,
+      buildSummary(
+        bill,
+        payRows.filter((p) => p.billId === bill.id),
+        refRows.filter((r) => r.billId === bill.id),
+      ),
+    );
+  }
+  return result;
 }
 
 export async function getBillPaymentSummaryDb(
@@ -268,6 +320,61 @@ export async function issueBillDb(
   });
 }
 
+// ---- itemised receipt -----------------------------------------------------
+
+export type { BillReceipt } from "./receipt";
+
+/**
+ * Itemised receipt for one bill, built only from stored rows (order items,
+ * bill totals, payments), scoped to the restaurant.
+ */
+export async function getBillReceiptDb(
+  restaurantId: string,
+  billId: string
+): Promise<BillReceipt | null> {
+  const [bill] = await db
+    .select()
+    .from(bills)
+    .where(and(eq(bills.id, billId), eq(bills.restaurantId, restaurantId)));
+  if (!bill) return null;
+
+  const [order] = await db.select().from(orders).where(eq(orders.id, bill.orderId));
+  const [table] = await db
+    .select()
+    .from(restaurantTables)
+    .where(eq(restaurantTables.id, bill.tableId));
+  const items = await db.select().from(orderItems).where(eq(orderItems.orderId, bill.orderId));
+  const payRows = await db.select().from(payments).where(eq(payments.billId, bill.id));
+
+  return buildReceipt({
+    bill: {
+      id: bill.id,
+      orderId: bill.orderId,
+      subtotalPaise: bill.subtotalPaise,
+      gstPaise: bill.gstPaise,
+      discountPaise: bill.discountPaise,
+      serviceChargePaise: bill.serviceChargePaise,
+      totalPaise: bill.totalPaise,
+      paidAt: bill.paidAt,
+      paymentMethod: bill.paymentMethod,
+    },
+    items: items.map((i) => ({
+      code: i.code,
+      nameSnapshot: i.nameSnapshot,
+      qty: i.qty,
+      pricePaise: i.pricePaise,
+    })),
+    payments: payRows.map((p) => ({
+      method: p.method,
+      amountPaise: p.amountPaise,
+      transactionId: p.transactionId,
+      createdAt: p.createdAt,
+    })),
+    tableLabel: table?.label ?? bill.tableId,
+    orderPlacedAt: order?.createdAt ?? bill.createdAt,
+  });
+}
+
 // ---- record payment -------------------------------------------------------
 
 function isUniqueViolation(err: unknown): boolean {
@@ -291,6 +398,37 @@ export async function recordBillPaymentDb(
       if (!row) return { ok: false, reason: "not-found" };
 
       const bill = toBill(row);
+
+      // Idempotent replay: the bill row is locked above, so a repeated
+      // submission (double click, retry, two tabs) with the same key waits
+      // here, then returns the payment already recorded instead of paying again.
+      const rawKey = input.idempotencyKey;
+      const idempotencyKey =
+        typeof rawKey === "string" && rawKey.trim() !== "" && rawKey.length <= 100
+          ? rawKey.trim()
+          : null;
+
+      if (idempotencyKey !== null) {
+        const [existing] = await tx
+          .select()
+          .from(payments)
+          .where(
+            and(
+              eq(payments.restaurantId, restaurantId),
+              eq(payments.idempotencyKey, idempotencyKey)
+            )
+          );
+        if (existing) {
+          if (existing.billId !== bill.id) {
+            return { ok: false, reason: "duplicate-reference" };
+          }
+          const summary = await summaryFor(tx, bill);
+          const payment =
+            summary.payments.find((p) => p.id === existing.id) ??
+            summary.payments[summary.payments.length - 1];
+          return { ok: true, bill, payment, settled: bill.paidAt !== null, summary };
+        }
+      }
 
       if (bill.paidAt !== null || bill.paymentMethod !== null) {
         return { ok: false, reason: "already-paid", bill };
@@ -358,6 +496,7 @@ export async function recordBillPaymentDb(
         amountPaise: amount * 100,
         status: "paid",
         transactionId: reference,
+        idempotencyKey,
         createdAt: now,
         updatedAt: now,
       });

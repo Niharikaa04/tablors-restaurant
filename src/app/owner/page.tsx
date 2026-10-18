@@ -1,10 +1,10 @@
 import { requirePermission } from "@/server/modules/auth/session";
 import { getSettings } from "@/server/modules/demo-store/settings";
 import {
-  getOrdersByCategory,
-  getOrdersByHourWindow,
-  getTodayOverview,
-} from "@/server/modules/demo-store/store";
+  getOrdersByCategoryDb,
+  getOrdersByHourWindowDb,
+  getTodayOverviewDb,
+} from "@/server/modules/data/analytics-db";
 import { OverviewHeader } from "@/components/dashboard/overview-header";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { MetricStrip } from "@/components/dashboard/metric-strip";
@@ -20,10 +20,10 @@ import { TopSellingItems } from "@/components/dashboard/top-selling-items";
 
 export default async function OwnerDashboardPage() {
   const session = await requirePermission("overview");
-  const restaurantName = getSettings(session.restaurantId).name;
-  const overview = getTodayOverview();
-  const hourlySeries = getOrdersByHourWindow(11);
-  const categories = getOrdersByCategory();
+  const restaurantName = (await getSettings(session.restaurantId)).name;
+  const overview = await getTodayOverviewDb(session.restaurantId);
+  const hourlySeries = await getOrdersByHourWindowDb(session.restaurantId, 11);
+  const categories = await getOrdersByCategoryDb(session.restaurantId);
 
   // Derived, not invented: a straightforward calculation from two real
   // values already returned by getTodayOverview(). Guarded against

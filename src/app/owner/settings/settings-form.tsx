@@ -110,7 +110,6 @@ export function SettingsForm({ initial }: { initial: RestaurantSettings }) {
       </Section>
 
       <Section title="Kitchen settings">
-        <Toggle label="Auto-accept new orders" checked={s.kitchen.autoAcceptOrders} onChange={(v) => set("kitchen", { ...s.kitchen, autoAcceptOrders: v })} />
         <Toggle label="Sound alerts for new orders" checked={s.kitchen.soundAlerts} onChange={(v) => set("kitchen", { ...s.kitchen, soundAlerts: v })} />
         <Field label="Default prep time (minutes)"><input type="number" min={1} max={180} className={input} value={s.kitchen.defaultPrepMinutes} onChange={(e) => set("kitchen", { ...s.kitchen, defaultPrepMinutes: Number(e.target.value) })} /></Field>
       </Section>

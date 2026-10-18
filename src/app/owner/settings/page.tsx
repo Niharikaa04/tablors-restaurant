@@ -4,5 +4,5 @@ import { SettingsForm } from "./settings-form";
 
 export default async function SettingsPage() {
   const session = await requirePermission("settings");
-  return <SettingsForm initial={getSettings(session.restaurantId)} />;
+  return <SettingsForm initial={await getSettings(session.restaurantId)} />;
 }

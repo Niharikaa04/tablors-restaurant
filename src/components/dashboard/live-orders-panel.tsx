@@ -1,4 +1,6 @@
-import { getOrders, getTables } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getTablesDb } from "@/server/modules/data/tables-db";
+import { listActiveOrders } from "@/server/modules/orders/db-orders";
 import { StatusPill } from "./status-pill";
 import { SectionHeader } from "./section-header";
 
@@ -9,10 +11,9 @@ function timeAgo(createdAt: number): string {
   return `${minutes} min ago`;
 }
 
-export function LiveOrdersPanel() {
-  const tables = getTables();
-  const orders = getOrders()
-    .filter((o) => o.status !== "billed")
+export async function LiveOrdersPanel() {
+  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
+  const orders = (await listActiveOrders(DEMO_RESTAURANT_ID))
     .sort((a, b) => b.createdAt - a.createdAt);
 
   return (

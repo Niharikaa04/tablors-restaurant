@@ -1,3 +1,7 @@
+import "server-only";
+
+import { getDoc, listDocs, putDoc } from "@/server/modules/data/documents";
+
 /** DEMO support-ticket store (in-memory). Every function takes restaurantId first. */
 
 export const TICKET_TYPES = [
@@ -30,24 +34,27 @@ export interface SupportTicket {
   messages: SupportMessage[];
 }
 
-const g = globalThis as unknown as { __tablorsTickets?: SupportTicket[]; __tablorsTicketN?: number };
-const db = () => (g.__tablorsTickets ??= []);
+const COLLECTION = "support_tickets";
 
-export function listTickets(restaurantId: string): SupportTicket[] {
-  return db()
-    .filter((t) => t.restaurantId === restaurantId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .map((t) => ({ ...t, messages: [...t.messages] }));
+export async function listTickets(restaurantId: string): Promise<SupportTicket[]> {
+  const docs = await listDocs<SupportTicket>(restaurantId, COLLECTION);
+  return docs
+    .map((d) => d.data)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function createTicket(
+export async function createTicket(
   restaurantId: string,
-  input: { type: TicketType; subject: string; description: string; deviceId: string | null }
-): SupportTicket {
-  g.__tablorsTicketN = (g.__tablorsTicketN ?? 1000) + 1;
+  input: { type: TicketType; subject: string; description: string; deviceId: string | null },
+): Promise<SupportTicket> {
+  const existing = await listDocs<SupportTicket>(restaurantId, COLLECTION);
+  const highest = existing.reduce((max, d) => {
+    const n = Number(d.id.replace("TKT-", ""));
+    return Number.isFinite(n) ? Math.max(max, n) : max;
+  }, 1000);
   const now = new Date().toISOString();
   const t: SupportTicket = {
-    id: `TKT-${g.__tablorsTicketN}`,
+    id: `TKT-${highest + 1}`,
     restaurantId,
     ...input,
     status: "open",
@@ -55,23 +62,33 @@ export function createTicket(
     updatedAt: now,
     messages: [{ from: "restaurant", text: input.description, at: now }],
   };
-  db().push(t);
-  return { ...t };
+  await putDoc(restaurantId, COLLECTION, t.id, t);
+  return t;
 }
 
-export function addTicketMessage(restaurantId: string, id: string, text: string): boolean {
-  const t = db().find((x) => x.restaurantId === restaurantId && x.id === id);
+export async function addTicketMessage(
+  restaurantId: string,
+  id: string,
+  text: string,
+): Promise<boolean> {
+  const t = await getDoc<SupportTicket>(restaurantId, COLLECTION, id);
   if (!t || t.status === "resolved") return false;
   const now = new Date().toISOString();
   t.messages.push({ from: "restaurant", text, at: now });
   t.updatedAt = now;
+  await putDoc(restaurantId, COLLECTION, id, t);
   return true;
 }
 
-export function setTicketStatus(restaurantId: string, id: string, status: TicketStatus): boolean {
-  const t = db().find((x) => x.restaurantId === restaurantId && x.id === id);
+export async function setTicketStatus(
+  restaurantId: string,
+  id: string,
+  status: TicketStatus,
+): Promise<boolean> {
+  const t = await getDoc<SupportTicket>(restaurantId, COLLECTION, id);
   if (!t) return false;
   t.status = status;
   t.updatedAt = new Date().toISOString();
+  await putDoc(restaurantId, COLLECTION, id, t);
   return true;
 }

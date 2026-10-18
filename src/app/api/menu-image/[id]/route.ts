@@ -1,4 +1,7 @@
-import { getMenuImage } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getMenuImageDb } from "@/server/modules/data/menu-db";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Serves a menu item's uploaded image from the shared store. Public on
@@ -10,7 +13,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const image = getMenuImage(id);
+  const image = await getMenuImageDb(DEMO_RESTAURANT_ID, id);
   if (!image) return new Response("Not found", { status: 404 });
 
   return new Response(image.bytes as BodyInit, {

@@ -1,9 +1,11 @@
+import { listAllOrders } from "@/server/modules/orders/db-orders";
 import {
-  getBillPaymentSummary,
-  getBills,
-  getDevices,
-  getOrders,
-  getTables,
+  getBillSummariesDb,
+  listBillsDb,
+} from "@/server/modules/billing/db-billing";
+import { getDevicesDb } from "@/server/modules/data/devices-db";
+import { getTablesDb } from "@/server/modules/data/tables-db";
+import {
   type Bill,
   type Device,
   type Order,
@@ -98,12 +100,19 @@ function mergeItems(orders: Order[]): TableItem[] {
   return Array.from(merged.values());
 }
 
-export function getTableActivities(now: number = Date.now()): TableActivity[] {
-  const orders = getOrders();
-  const bills = getBills();
-  const devices = getDevices();
+export async function getTableActivities(
+  restaurantId: string,
+  now: number = Date.now(),
+): Promise<TableActivity[]> {
+  const [orders, bills, devices, tableList] = await Promise.all([
+    listAllOrders(restaurantId),
+    listBillsDb(restaurantId),
+    getDevicesDb(restaurantId),
+    getTablesDb(restaurantId),
+  ]);
+  const summaries = await getBillSummariesDb(restaurantId, bills);
 
-  return getTables().map((table) => {
+  return tableList.map((table) => {
     const activeOrders = orders.filter(
       (o) => o.tableId === table.id && o.status !== "billed"
     );
@@ -137,7 +146,7 @@ export function getTableActivities(now: number = Date.now()): TableActivity[] {
       shownBill = openBill;
       shownOrders = orders.filter((o) => o.id === openBill.orderId);
       state =
-        getBillPaymentSummary(openBill).paidRupees > 0 ? "part-paid" : "bill-issued";
+        (summaries.get(openBill.id)?.paidRupees ?? 0) > 0 ? "part-paid" : "bill-issued";
     } else if (justPaid) {
       shownBill = justPaid;
       shownOrders = orders.filter((o) => o.id === justPaid.orderId);
@@ -157,7 +166,7 @@ export function getTableActivities(now: number = Date.now()): TableActivity[] {
       (sum, o) => sum + o.lines.reduce((s, l) => s + l.qty * l.priceRupees, 0),
       0
     );
-    const summary = shownBill ? getBillPaymentSummary(shownBill) : null;
+    const summary = shownBill ? (summaries.get(shownBill.id) ?? null) : null;
 
     return {
       table,

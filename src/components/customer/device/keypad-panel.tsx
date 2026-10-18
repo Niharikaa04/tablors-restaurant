@@ -150,7 +150,7 @@ function ArrowKey({
     <button
       type="button"
       onClick={onClick}
-      aria-label={isUp ? "Scroll order list up" : "Scroll order list down"}
+      aria-label={isUp ? "Previous menu page" : "Next menu page"}
       className="flex h-[2.75rem] w-[2.75rem] items-center justify-center rounded-full border border-black text-white transition-transform active:scale-95"
       style={{
         background: isUp
@@ -177,13 +177,6 @@ function ArrowKey({
   );
 }
 
-/* Scrolls the order list on the LCD screen (OrderPanel has id="tablor-order-list") */
-function scrollOrderList(delta: number) {
-  document
-    .getElementById("tablor-order-list")
-    ?.scrollBy({ top: delta, behavior: "smooth" });
-}
-
 /* ------------------------------------------------------------------ */
 /* Panel                                                               */
 /* ------------------------------------------------------------------ */
@@ -206,6 +199,8 @@ export function KeypadPanel({
   onCallWaiter,
   waiterCalling,
   onFeedback,
+  onArrowUp,
+  onArrowDown,
 }: {
   selectedItemName: string | null;
   codeDraft: string;
@@ -224,6 +219,8 @@ export function KeypadPanel({
   onCallWaiter: () => void;
   waiterCalling: boolean;
   onFeedback: () => void;
+  onArrowUp: () => void;
+  onArrowDown: () => void;
 }) {
   const ROWS = "grid-rows-[repeat(4,2.75rem)]";
 
@@ -380,8 +377,8 @@ export function KeypadPanel({
             </div>
 
             <div className="flex items-center gap-1.5">
-              <ArrowKey direction="up" onClick={() => scrollOrderList(-80)} />
-              <ArrowKey direction="down" onClick={() => scrollOrderList(80)} />
+              <ArrowKey direction="up" onClick={onArrowUp} />
+              <ArrowKey direction="down" onClick={onArrowDown} />
             </div>
           </div>
         </div>

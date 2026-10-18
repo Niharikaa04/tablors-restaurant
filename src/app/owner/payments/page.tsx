@@ -1,15 +1,23 @@
 
+import { randomUUID } from "node:crypto";
+import { DayPicker } from "@/components/ui/day-picker";
+import { istDay, resolveDay, todayIst, yesterdayIst } from "@/lib/day";
+import { LiveRefresh } from "@/components/live/live-refresh";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { SubmitOnceButton } from "@/components/ui/submit-once-button";
 import { getDemoRole } from "@/server/modules/auth/session";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
 import {
-  getBillPaymentSummary,
-  getBills,
-  getDailyCollection,
-  getPayments,
-  getRefunds,
-  getTables,
+  getBillSummariesDb,
+  getDailyCollectionDb,
+  listBillsDb,
+  listPaymentsDb,
+  listRefundsDb,
+} from "@/server/modules/billing/db-billing";
+import { getTablesDb } from "@/server/modules/data/tables-db";
+import {
   type PaymentStatus,
 } from "@/server/modules/demo-store/store";
 import {
@@ -20,7 +28,7 @@ import {
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  searchParams: Promise<{ notice?: string; bill?: string }>;
+  searchParams: Promise<{ notice?: string; bill?: string; date?: string }>;
 };
 
 type Notice = {
@@ -63,12 +71,22 @@ function getNotice(code?: string): Notice | null {
     case "invalid-method":
       return {
         tone: "error",
-        text: "Only cash payments are accepted.",
+        text: "Only cash and QR payments are accepted.",
       };
     case "missing-reference":
       return {
         tone: "error",
-        text: "Cash payments do not require a transaction ID.",
+        text: "QR payments need a transaction ID / UTR.",
+      };
+    case "invalid-reference":
+      return {
+        tone: "error",
+        text: "Enter a valid transaction ID (6–40 letters, digits, - _ / .).",
+      };
+    case "duplicate-reference":
+      return {
+        tone: "error",
+        text: "That transaction ID has already been used. Nothing was recorded.",
       };
     case "missing-bill":
       return {
@@ -180,16 +198,21 @@ export default async function PaymentsPage({
   }
 
   const canManage = role === "owner";
-  const { notice, bill: noticeBillId } = await searchParams;
+  const { notice, bill: noticeBillId, date } = await searchParams;
   const noticeData = getNotice(
     typeof notice === "string" ? notice : undefined,
   );
 
-  const tables = getTables();
-  const bills = getBills();
-  const payments = getPayments();
-  const refunds = getRefunds();
-  const collection = getDailyCollection();
+  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
+  const bills = await listBillsDb(DEMO_RESTAURANT_ID);
+  const payments = await listPaymentsDb(DEMO_RESTAURANT_ID);
+  const refunds = await listRefundsDb(DEMO_RESTAURANT_ID);
+  const today = todayIst();
+  const selectedDay = resolveDay(date);
+  const dayPayments = payments.filter((p) => istDay(p.paidAt) === selectedDay);
+  const collection = await getDailyCollectionDb(DEMO_RESTAURANT_ID);
+  const summaries = await getBillSummariesDb(DEMO_RESTAURANT_ID, bills);
+  const getBillPaymentSummary = (b: (typeof bills)[number]) => summaries.get(b.id)!;
 
   const outstanding = bills.filter((bill) => {
     const status = getBillPaymentSummary(bill).status;
@@ -200,6 +223,7 @@ export default async function PaymentsPage({
 
   return (
     <div className="space-y-2">
+      <LiveRefresh intervalMs={10000} />
       <h1 className="text-2xl text-[var(--color-text-primary)]">
         Payments
       </h1>
@@ -388,14 +412,73 @@ export default async function PaymentsPage({
                         value="cash"
                       />
 
-                      <button type="submit" className={buttonClass}>
+                      {/* One key per rendered form: a repeated submit is a server-side no-op. */}
+                      <input
+                        type="hidden"
+                        name="idempotencyKey"
+                        value={randomUUID()}
+                      />
+
+                      <SubmitOnceButton
+                        className={buttonClass}
+                        pendingLabel="Recording payment…"
+                      >
                         Pay by Cash
-                      </button>
+                      </SubmitOnceButton>
 
                       <p className="text-xs text-[var(--color-text-muted)]">
                         Enter less than the remaining amount for a part
                         payment. The table is released only when the bill
                         is fully paid.
+                      </p>
+                    </form>
+                  )}
+
+                  {canManage && (
+                    <form
+                      action={recordPaymentAction}
+                      className="mt-4 space-y-3 border-t border-[var(--color-border)] pt-4"
+                    >
+                      <input type="hidden" name="billId" value={bill.id} />
+                      <input type="hidden" name="method" value="qr" />
+                      <input type="hidden" name="idempotencyKey" value={randomUUID()} />
+
+                      <label className="block text-xs text-[var(--color-text-secondary)]">
+                        Amount ₹ (whole rupees)
+                        <input
+                          type="number"
+                          name="amountRupees"
+                          defaultValue={summary.remainingRupees}
+                          min={1}
+                          max={summary.remainingRupees}
+                          step={1}
+                          required
+                          className={inputClass}
+                        />
+                      </label>
+
+                      <label className="block text-xs text-[var(--color-text-secondary)]">
+                        QR transaction ID / UTR
+                        <input
+                          type="text"
+                          name="transactionId"
+                          minLength={6}
+                          maxLength={40}
+                          required
+                          autoComplete="off"
+                          className={inputClass}
+                        />
+                      </label>
+
+                      <SubmitOnceButton
+                        className={buttonClass}
+                        pendingLabel="Recording payment…"
+                      >
+                        Record QR payment
+                      </SubmitOnceButton>
+
+                      <p className="text-xs text-[var(--color-text-muted)]">
+                        Each transaction ID can be used only once.
                       </p>
                     </form>
                   )}
@@ -410,6 +493,7 @@ export default async function PaymentsPage({
         <h2 className="text-sm text-[var(--color-text-muted)]">
           Payment history
         </h2>
+        <DayPicker value={selectedDay} today={today} yesterday={yesterdayIst()} />
 
         <div className="mt-3 overflow-x-auto rounded-[var(--radius-brand)] border border-[var(--color-border)]">
           <table className="w-full text-sm">
@@ -429,18 +513,18 @@ export default async function PaymentsPage({
             </thead>
 
             <tbody>
-              {payments.length === 0 && (
+              {dayPayments.length === 0 && (
                 <tr>
                   <td
                     colSpan={10}
                     className="px-4 py-4 text-[var(--color-text-muted)]"
                   >
-                    No payments recorded yet.
+                    {selectedDay === today ? "No payments recorded yet today." : "No payments on this day."}
                   </td>
                 </tr>
               )}
 
-              {payments
+              {dayPayments
                 .slice()
                 .reverse()
                 .map((payment) => {
@@ -550,12 +634,12 @@ export default async function PaymentsPage({
                                 />
                               </label>
 
-                              <button
-                                type="submit"
+                              <SubmitOnceButton
                                 className="w-full rounded-[var(--radius-brand)] bg-[var(--color-warning)] px-3 py-1.5 text-xs font-medium text-[#0a0a0a]"
+                                pendingLabel="Refunding…"
                               >
                                 Confirm refund
-                              </button>
+                              </SubmitOnceButton>
                             </form>
                           </details>
                         )}

@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { getOrders, getTables } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getTablesDb } from "@/server/modules/data/tables-db";
+import { listAllOrders } from "@/server/modules/orders/db-orders";
 import { StatusPill } from "./status-pill";
 import { SectionHeader } from "./section-header";
 
-export function RecentOrdersTable() {
-  const tables = getTables();
-  const orders = [...getOrders()].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6);
+export async function RecentOrdersTable() {
+  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
+  const orders = [...(await listAllOrders(DEMO_RESTAURANT_ID))].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6);
 
   return (
     <div className="rounded-xl border border-[var(--ov-border)] bg-[var(--ov-surface)] p-5">

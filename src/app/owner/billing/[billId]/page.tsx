@@ -3,12 +3,13 @@ import { notFound, redirect } from "next/navigation";
 
 import { PrintBillButton } from "@/components/billing/print-bill-button";
 import { getDemoRole } from "@/server/modules/auth/session";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
 import {
-  getBills,
-  getOrder,
-  getTableById,
-  getBillPaymentSummary,
-} from "@/server/modules/demo-store/store";
+  getBillDb,
+  getBillPaymentSummaryDb,
+} from "@/server/modules/billing/db-billing";
+import { getTableByIdDb } from "@/server/modules/data/tables-db";
+import { getOrderFromDb } from "@/server/modules/orders/db-orders";
 
 export const dynamic = "force-dynamic";
 
@@ -46,16 +47,16 @@ export default async function BillReceiptPage({ params }: PageProps) {
 
   const { billId } = await params;
 
-  const bill = getBills().find((b) => b.id === billId);
+  const bill = await getBillDb(DEMO_RESTAURANT_ID, billId);
 
   if (!bill) {
     notFound();
   }
 
-  const order = getOrder(bill.orderId);
-  const table = getTableById(bill.tableId);
+  const order = await getOrderFromDb(DEMO_RESTAURANT_ID, bill.orderId);
+  const table = await getTableByIdDb(DEMO_RESTAURANT_ID, bill.tableId);
   const lines = order?.lines ?? [];
-  const summary = getBillPaymentSummary(bill);
+  const summary = (await getBillPaymentSummaryDb(DEMO_RESTAURANT_ID, bill.id))!;
 
   return (
     <div>

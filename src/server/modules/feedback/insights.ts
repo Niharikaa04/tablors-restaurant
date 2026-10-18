@@ -6,8 +6,8 @@ const LOW = 2; // a rating <= 2 counts as a complaint
 const overall = (f: Feedback) => (f.foodRating + f.serviceRating + f.orderingRating) / 3;
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
-export function getFeedbackInsights() {
-  const all = listFeedback().sort((a, b) => b.submittedAt - a.submittedAt);
+export async function getFeedbackInsights() {
+  const all = (await listFeedback()).sort((a, b) => b.submittedAt - a.submittedAt);
 
   const categories: { name: Category; average: number; lowCount: number }[] = [
     { name: "Food", average: avg(all.map((f) => f.foodRating)), lowCount: all.filter((f) => f.foodRating <= LOW).length },

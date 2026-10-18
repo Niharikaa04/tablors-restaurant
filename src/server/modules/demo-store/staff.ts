@@ -1,5 +1,7 @@
+import "server-only";
+
+import { deleteDoc, getDoc, listDocs, putDoc } from "@/server/modules/data/documents";
 import type { StaffRole } from "@/server/modules/auth/demo-auth";
-import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
 
 /**
  * DEMO staff data (in-memory). Every function takes restaurantId first and
@@ -50,9 +52,6 @@ export interface LeaveInput {
   reason: string;
 }
 
-const OTHER_RESTAURANT_ID = "demo-restaurant-b";
-
-/** Today's date (yyyy-mm-dd) in the restaurant's time zone. */
 export function todayInIndia(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -62,83 +61,39 @@ export function todayInIndia(): string {
   }).format(new Date());
 }
 
-function seed(): StaffMember[] {
-  const now = Date.now();
-  const ago = (hours: number) => new Date(now - hours * 3_600_000).toISOString();
-  const make = (
-    id: string,
-    restaurantId: string,
-    name: string,
-    contact: string,
-    role: StaffRole,
-    status: StaffStatus,
-    createdHoursAgo: number,
-    activeHoursAgo: number | null
-  ): StaffMember => ({
-    id,
-    restaurantId,
-    name,
-    contact,
-    role,
-    status,
-    joinedOn: null, // not set until the owner fills it in
-    createdAt: ago(createdHoursAgo),
-    updatedAt: ago(createdHoursAgo),
-    lastActiveAt: activeHoursAgo === null ? null : ago(activeHoursAgo),
-  });
+const STAFF = "staff";
+const LEAVES = "staff_leaves";
 
-  return [
-    make("staff_seed_1", DEMO_RESTAURANT_ID, "Demo Owner", "owner@tablors.demo", "owner", "active", 720, 1),
-    make("staff_seed_2", DEMO_RESTAURANT_ID, "Meera Rao", "meera@tablors.demo", "manager", "active", 600, 5),
-    make("staff_seed_3", DEMO_RESTAURANT_ID, "Arjun Das", "+91 98765 43210", "cashier", "active", 500, 3),
-    make("staff_seed_4", DEMO_RESTAURANT_ID, "Kiran Babu", "kiran@tablors.demo", "kitchen", "active", 400, 2),
-    make("staff_seed_5", DEMO_RESTAURANT_ID, "Ravi Teja", "+91 91234 56789", "waiter", "inactive", 300, 200),
-    // A second restaurant, so tenant isolation is visible when testing.
-    make("staff_seed_b1", OTHER_RESTAURANT_ID, "Restaurant B Owner", "owner@restaurant-b.demo", "owner", "active", 100, 4),
-  ];
+// Staff start empty: no demo/fake people are ever written to a real database.
+
+export async function listStaff(restaurantId: string): Promise<StaffMember[]> {
+  return (await listDocs<StaffMember>(restaurantId, STAFF))
+    .map((d) => d.data)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-// globalThis keeps the data across Next.js hot reloads in dev.
-const globalStore = globalThis as unknown as {
-  __tablorsStaff?: StaffMember[];
-  __tablorsLeaves?: Leave[];
-};
-function db(): StaffMember[] {
-  return (globalStore.__tablorsStaff ??= seed());
-}
-function leaveDb(): Leave[] {
-  return (globalStore.__tablorsLeaves ??= []);
+export async function getStaff(restaurantId: string, id: string): Promise<StaffMember | undefined> {
+  return (await getDoc<StaffMember>(restaurantId, STAFF, id)) ?? undefined;
 }
 
-export function listStaff(restaurantId: string): StaffMember[] {
-  return db()
-    .filter((m) => m.restaurantId === restaurantId)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .map((m) => ({ ...m }));
-}
-
-export function getStaff(restaurantId: string, id: string): StaffMember | undefined {
-  const found = db().find((m) => m.restaurantId === restaurantId && m.id === id);
-  return found ? { ...found } : undefined;
-}
-
-export function countActiveOwners(restaurantId: string): number {
-  return db().filter(
-    (m) => m.restaurantId === restaurantId && m.role === "owner" && m.status === "active"
+export async function countActiveOwners(restaurantId: string): Promise<number> {
+  return (await listStaff(restaurantId)).filter(
+    (m) => m.role === "owner" && m.status === "active",
   ).length;
 }
 
-export function isContactTaken(restaurantId: string, contact: string, exceptId?: string): boolean {
+export async function isContactTaken(
+  restaurantId: string,
+  contact: string,
+  exceptId?: string,
+): Promise<boolean> {
   const wanted = contact.trim().toLowerCase();
-  return db().some(
-    (m) =>
-      m.restaurantId === restaurantId &&
-      m.id !== exceptId &&
-      m.contact.trim().toLowerCase() === wanted
+  return (await listStaff(restaurantId)).some(
+    (m) => m.id !== exceptId && m.contact.trim().toLowerCase() === wanted,
   );
 }
 
-export function createStaff(restaurantId: string, input: StaffInput): StaffMember {
+export async function createStaff(restaurantId: string, input: StaffInput): Promise<StaffMember> {
   const now = new Date().toISOString();
   const member: StaffMember = {
     id: `staff_${crypto.randomUUID()}`,
@@ -152,69 +107,58 @@ export function createStaff(restaurantId: string, input: StaffInput): StaffMembe
     updatedAt: now,
     lastActiveAt: null,
   };
-  db().push(member);
-  return { ...member };
+  await putDoc(restaurantId, STAFF, member.id, member);
+  return member;
 }
 
-export function updateStaff(
+export async function updateStaff(
   restaurantId: string,
   id: string,
-  patch: Partial<StaffInput>
-): StaffMember | undefined {
-  const found = db().find((m) => m.restaurantId === restaurantId && m.id === id);
+  patch: Partial<StaffInput>,
+): Promise<StaffMember | undefined> {
+  const found = await getStaff(restaurantId, id);
   if (!found) return undefined;
-  if (patch.name !== undefined) found.name = patch.name;
-  if (patch.contact !== undefined) found.contact = patch.contact;
-  if (patch.role !== undefined) found.role = patch.role;
-  if (patch.status !== undefined) found.status = patch.status;
-  if (patch.joinedOn !== undefined) found.joinedOn = patch.joinedOn;
-  found.updatedAt = new Date().toISOString();
-  return { ...found };
+  const next: StaffMember = { ...found, updatedAt: new Date().toISOString() };
+  if (patch.name !== undefined) next.name = patch.name;
+  if (patch.contact !== undefined) next.contact = patch.contact;
+  if (patch.role !== undefined) next.role = patch.role;
+  if (patch.status !== undefined) next.status = patch.status;
+  if (patch.joinedOn !== undefined) next.joinedOn = patch.joinedOn;
+  await putDoc(restaurantId, STAFF, id, next);
+  return next;
 }
 
-export function deleteStaff(restaurantId: string, id: string): boolean {
-  const list = db();
-  const index = list.findIndex((m) => m.restaurantId === restaurantId && m.id === id);
-  if (index === -1) return false;
-  list.splice(index, 1);
-  // Their leave records go with them.
-  const leaves = leaveDb();
-  for (let i = leaves.length - 1; i >= 0; i -= 1) {
-    if (leaves[i].restaurantId === restaurantId && leaves[i].staffId === id) leaves.splice(i, 1);
+export async function deleteStaff(restaurantId: string, id: string): Promise<boolean> {
+  const removed = await deleteDoc(restaurantId, STAFF, id);
+  if (!removed) return false;
+  for (const l of await listLeaves(restaurantId)) {
+    if (l.staffId === id) await deleteDoc(restaurantId, LEAVES, l.id);
   }
   return true;
 }
 
-/* ------------------------------ Leaves ------------------------------ */
-
-export function listLeaves(restaurantId: string): Leave[] {
-  return leaveDb()
-    .filter((l) => l.restaurantId === restaurantId)
-    .sort((a, b) => b.from.localeCompare(a.from))
-    .map((l) => ({ ...l }));
+export async function listLeaves(restaurantId: string): Promise<Leave[]> {
+  return (await listDocs<Leave>(restaurantId, LEAVES))
+    .map((d) => d.data)
+    .sort((a, b) => b.from.localeCompare(a.from));
 }
 
-export function getLeave(restaurantId: string, id: string): Leave | undefined {
-  const found = leaveDb().find((l) => l.restaurantId === restaurantId && l.id === id);
-  return found ? { ...found } : undefined;
+export async function getLeave(restaurantId: string, id: string): Promise<Leave | undefined> {
+  return (await getDoc<Leave>(restaurantId, LEAVES, id)) ?? undefined;
 }
 
-export function hasLeaveOverlap(
+export async function hasLeaveOverlap(
   restaurantId: string,
   staffId: string,
   from: string,
-  to: string
-): boolean {
-  return leaveDb().some(
-    (l) =>
-      l.restaurantId === restaurantId &&
-      l.staffId === staffId &&
-      l.from <= to &&
-      from <= l.to
+  to: string,
+): Promise<boolean> {
+  return (await listLeaves(restaurantId)).some(
+    (l) => l.staffId === staffId && l.from <= to && from <= l.to,
   );
 }
 
-export function addLeave(restaurantId: string, input: LeaveInput): Leave {
+export async function addLeave(restaurantId: string, input: LeaveInput): Promise<Leave> {
   const leave: Leave = {
     id: `leave_${crypto.randomUUID()}`,
     restaurantId,
@@ -225,14 +169,10 @@ export function addLeave(restaurantId: string, input: LeaveInput): Leave {
     reason: input.reason,
     createdAt: new Date().toISOString(),
   };
-  leaveDb().push(leave);
-  return { ...leave };
+  await putDoc(restaurantId, LEAVES, leave.id, leave);
+  return leave;
 }
 
-export function deleteLeave(restaurantId: string, id: string): boolean {
-  const list = leaveDb();
-  const index = list.findIndex((l) => l.restaurantId === restaurantId && l.id === id);
-  if (index === -1) return false;
-  list.splice(index, 1);
-  return true;
+export async function deleteLeave(restaurantId: string, id: string): Promise<boolean> {
+  return deleteDoc(restaurantId, LEAVES, id);
 }

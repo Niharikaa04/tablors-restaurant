@@ -1,13 +1,14 @@
 import Link from "next/link";
 
 import { getDemoRole } from "@/server/modules/auth/session";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
 import {
-  getBills,
-  getOrders,
-  getPayments,
-  getRefunds,
-  getTables,
-} from "@/server/modules/demo-store/store";
+  listBillsDb,
+  listPaymentsDb,
+  listRefundsDb,
+} from "@/server/modules/billing/db-billing";
+import { getTablesDb } from "@/server/modules/data/tables-db";
+import { listAllOrders } from "@/server/modules/orders/db-orders";
 import {
   PERIOD_LABELS,
   REPORT_PERIODS,
@@ -70,11 +71,11 @@ export default async function ReportsPage({
   const period = parseReportPeriod((await searchParams).period);
   const r = buildSalesReport(
     {
-      orders: getOrders(),
-      bills: getBills(),
-      payments: getPayments(),
-      refunds: getRefunds(),
-      tables: getTables(),
+      orders: await listAllOrders(DEMO_RESTAURANT_ID),
+      bills: await listBillsDb(DEMO_RESTAURANT_ID),
+      payments: await listPaymentsDb(DEMO_RESTAURANT_ID),
+      refunds: await listRefundsDb(DEMO_RESTAURANT_ID),
+      tables: await getTablesDb(DEMO_RESTAURANT_ID),
     },
     period
   );

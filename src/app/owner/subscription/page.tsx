@@ -1,5 +1,5 @@
 import { requirePermission } from "@/server/modules/auth/session";
-import { getDevices } from "@/server/modules/demo-store/store";
+import { getDevicesDb } from "@/server/modules/data/devices-db";
 import { PLANS, PLAN_ORDER, deviceLimit, getSubscription, monthlyRupees } from "@/server/modules/demo-store/subscription";
 import { SubscriptionManager } from "./subscription-manager";
 
@@ -7,7 +7,7 @@ const dateFmt = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", dat
 
 export default async function SubscriptionPage() {
   const session = await requirePermission("subscription");
-  const sub = getSubscription(session.restaurantId);
+  const sub = await getSubscription(session.restaurantId);
 
   return (
     <SubscriptionManager
@@ -15,7 +15,7 @@ export default async function SubscriptionPage() {
       planName={PLANS[sub.plan].name}
       renewalLabel={dateFmt.format(new Date(sub.renewalDate))}
       monthlyRupees={monthlyRupees(sub)}
-      devicesUsed={getDevices().length}
+      devicesUsed={(await getDevicesDb(session.restaurantId)).length}
       deviceLimit={deviceLimit(sub)}
       plans={PLAN_ORDER.map((id) => ({ id, ...PLANS[id] }))}
       payments={sub.payments.map((p) => ({

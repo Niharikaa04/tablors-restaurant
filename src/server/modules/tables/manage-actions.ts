@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 
 import { requirePermission } from "@/server/modules/auth/session";
 import {
-  renameRestaurantTable,
-  reserveRestaurantTable,
-  setTableStatus,
-} from "@/server/modules/demo-store/store";
+  renameTableDb,
+  reserveTableDb,
+  setTableStatusDb,
+} from "@/server/modules/data/tables-db";
 
 function readText(formData: FormData, key: string): string {
   const raw = formData.get(key);
@@ -29,7 +29,7 @@ function back(tableId: string, notice: string): never {
 }
 
 export async function renameTableAction(formData: FormData): Promise<void> {
-  await requirePermission("tables");
+  const session = await requirePermission("tables");
 
   const tableId = readText(formData, "tableId");
 
@@ -37,7 +37,11 @@ export async function renameTableAction(formData: FormData): Promise<void> {
     return redirect("/owner/tables");
   }
 
-  const result = renameRestaurantTable(tableId, readText(formData, "label"));
+  const result = await renameTableDb(
+    session.restaurantId,
+    tableId,
+    readText(formData, "label"),
+  );
 
   if (!result.ok) {
     if (result.reason === "not-found") {
@@ -54,7 +58,7 @@ export async function renameTableAction(formData: FormData): Promise<void> {
 }
 
 export async function reserveTableAction(formData: FormData): Promise<void> {
-  await requirePermission("tables");
+  const session = await requirePermission("tables");
 
   const tableId = readText(formData, "tableId");
 
@@ -62,7 +66,7 @@ export async function reserveTableAction(formData: FormData): Promise<void> {
     return redirect("/owner/tables");
   }
 
-  const result = reserveRestaurantTable(tableId);
+  const result = await reserveTableDb(session.restaurantId, tableId);
 
   if (!result.ok) {
     if (result.reason === "not-found") {
@@ -76,7 +80,7 @@ export async function reserveTableAction(formData: FormData): Promise<void> {
 }
 
 export async function releaseTableAction(formData: FormData): Promise<void> {
-  await requirePermission("tables");
+  const session = await requirePermission("tables");
 
   const tableId = readText(formData, "tableId");
 
@@ -84,7 +88,7 @@ export async function releaseTableAction(formData: FormData): Promise<void> {
     return redirect("/owner/tables");
   }
 
-  const result = setTableStatus(tableId, "available");
+  const result = await setTableStatusDb(session.restaurantId, tableId, "available");
 
   if (!result.ok) {
     if (result.reason === "not-found") {

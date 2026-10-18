@@ -150,10 +150,14 @@ export async function advanceOrderFromForm(
     redirect("/owner/orders?notice=invalid");
   }
 
-  const result = await advanceOrder(
-    typeof orderId === "string" ? orderId : "",
-    expected ?? undefined,
-  );
+  const id = typeof orderId === "string" ? orderId : "";
+  let result = await advanceOrder(id, expected ?? undefined);
+
+  // "Mark Ready" on a new order: new → preparing → ready (both steps are
+  // recorded, so order history and the kitchen flow stay intact).
+  if (result.ok && expected === "new") {
+    result = await advanceOrder(id, "preparing");
+  }
 
   if (!result.ok) {
     redirect(`/owner/orders?notice=${result.code}`);
@@ -193,7 +197,7 @@ export async function placeCustomerOrder(
   }
 
   // Notify only after the database transaction has committed.
-  notify({
+  await notify({
     type: "ORDER_NEW",
     title: "New order received",
     message: `New order received from Table ${input.tableId}.`,

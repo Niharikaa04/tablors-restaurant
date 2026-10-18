@@ -22,6 +22,7 @@ type NotificationItem = {
 };
 
 const STATUS_EVENT = "tablors:notification-status";
+const REMOVED_EVENT = "tablors:notification-removed";
 
 export function useNotifications(playSound = false) {
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -98,10 +99,17 @@ export function useNotifications(playSound = false) {
     };
     window.addEventListener(STATUS_EVENT, onStatus);
 
+    const onRemoved = (event: Event) => {
+      const { id } = (event as CustomEvent<{ id: string }>).detail;
+      setItems((previous) => previous.filter((n) => n.id !== id));
+    };
+    window.addEventListener(REMOVED_EVENT, onRemoved);
+
     return () => {
       cancelled = true;
       es.close();
       window.removeEventListener(STATUS_EVENT, onStatus);
+      window.removeEventListener(REMOVED_EVENT, onRemoved);
     };
   }, [playSound]);
 
@@ -127,9 +135,25 @@ export function useNotifications(playSound = false) {
     );
   };
 
+  const remove = async (id: string) => {
+    const response = await fetch("/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+
+    // 404 means it is already gone (deleted elsewhere): drop it from the list too.
+    if (!response.ok && response.status !== 404) {
+      throw new Error("Failed to delete notification");
+    }
+
+    setItems((previous) => previous.filter((n) => n.id !== id));
+    window.dispatchEvent(new CustomEvent(REMOVED_EVENT, { detail: { id } }));
+  };
+
   const unread = items.filter(
     (notification) => notification.status === "unread",
   ).length;
 
-  return { items, unread, setStatus };
+  return { items, unread, setStatus, remove };
 }

@@ -11,6 +11,8 @@ import {
  
   index,
   uniqueIndex,
+  primaryKey,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -151,6 +153,8 @@ export const restaurantTables = pgTable(
     currentOrderId: text("current_order_id"),
     waiterCalled: boolean("waiter_called").notNull().default(false),
     waiterCalledAt: timestamp("waiter_called_at", { withTimezone: true }),
+    // Soft delete: removed tables keep their order/bill history.
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -421,6 +425,8 @@ export const payments = pgTable(
     amountPaise: integer("amount_paise").notNull(),
     status: paymentStatus("status").notNull().default("unpaid"),
     transactionId: text("transaction_id"),
+    /** Per-submission key so a repeated request replays instead of paying twice. */
+    idempotencyKey: text("idempotency_key"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -429,6 +435,9 @@ export const payments = pgTable(
       .notNull(),
   },
   (t) => [
+    uniqueIndex("payments_idempotency_unique")
+      .on(t.restaurantId, t.idempotencyKey)
+      .where(sql`${t.idempotencyKey} IS NOT NULL`),
     index("payments_bill_idx").on(t.billId),
     index("payments_restaurant_idx").on(t.restaurantId, t.createdAt),
     uniqueIndex("payments_txn_unique")
@@ -544,3 +553,133 @@ export const notificationPrefs = pgTable("notification_prefs", {
   quietStart: text("quiet_start"),
   quietEnd: text("quiet_end"),
 }).enableRLS();
+
+/**
+ * Generic per-restaurant JSON documents for the smaller modules
+ * (settings, staff, leave, subscription, support tickets, offers,
+ * loyalty, feedback). One row per document; collection names the module.
+ * Additive table: nothing existing is altered by it.
+ */
+export const appDocuments = pgTable(
+  "app_documents",
+  {
+    restaurantId: text("restaurant_id").notNull(),
+    collection: text("collection").notNull(),
+    id: text("id").notNull(),
+    data: jsonb("data").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.restaurantId, t.collection, t.id] }),
+    index("app_documents_collection_idx").on(t.restaurantId, t.collection),
+  ],
+).enableRLS();
+
+// ---------------------------------------------------------------------------
+// Loyalty points (separate ledger from money/Pots). See docs/loyalty.md.
+// ---------------------------------------------------------------------------
+
+export const loyaltySettings = pgTable("loyalty_settings", {
+  restaurantId: text("restaurant_id").primaryKey(),
+  enabled: boolean("enabled").notNull().default(true),
+  earnSpendPaise: integer("earn_spend_paise").notNull().default(1000),
+  earnPoints: integer("earn_points").notNull().default(1),
+  excludeGst: boolean("exclude_gst").notNull().default(true),
+  excludeServiceCharge: boolean("exclude_service_charge").notNull().default(true),
+  discountBeforePoints: boolean("discount_before_points").notNull().default(true),
+  minBillPaise: integer("min_bill_paise").notNull().default(0),
+  maxPointsPerBill: integer("max_points_per_bill"),
+  expiryMonths: integer("expiry_months"),
+  minPointsToRedeem: integer("min_points_to_redeem").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const loyaltyCustomers = pgTable(
+  "loyalty_customers",
+  {
+    id: text("id").primaryKey(),
+    restaurantId: text("restaurant_id").notNull(),
+    phone: text("phone").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("loyalty_customers_phone_unique").on(t.restaurantId, t.phone)]
+);
+
+export const loyaltyRewards = pgTable(
+  "loyalty_rewards",
+  {
+    id: text("id").primaryKey(),
+    restaurantId: text("restaurant_id").notNull(),
+    name: text("name").notNull(),
+    type: text("type").notNull(),
+    pointsCost: integer("points_cost").notNull(),
+    valuePaise: integer("value_paise"),
+    percent: integer("percent"),
+    maxDiscountPaise: integer("max_discount_paise"),
+    quantity: integer("quantity"),
+    terms: text("terms"),
+    active: boolean("active").notNull().default(true),
+    validFrom: timestamp("valid_from", { withTimezone: true }),
+    validTo: timestamp("valid_to", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("loyalty_rewards_restaurant_idx").on(t.restaurantId)]
+);
+
+/** Append-only. Balance = SUM(points). Never updated or deleted. */
+export const loyaltyTransactions = pgTable(
+  "loyalty_transactions",
+  {
+    id: text("id").primaryKey(),
+    restaurantId: text("restaurant_id").notNull(),
+    customerId: text("customer_id").notNull(),
+    /** EARN | REDEEM | REFUND_REVERSAL | EXPIRE | ADJUST */
+    type: text("type").notNull(),
+    points: integer("points").notNull(),
+    sourceId: text("source_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    reason: text("reason"),
+    actor: text("actor").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("loyalty_tx_idempotency_unique").on(t.restaurantId, t.idempotencyKey),
+    index("loyalty_tx_customer_idx").on(t.customerId, t.createdAt),
+  ]
+);
+
+export const loyaltyRedemptions = pgTable(
+  "loyalty_redemptions",
+  {
+    id: text("id").primaryKey(),
+    restaurantId: text("restaurant_id").notNull(),
+    customerId: text("customer_id").notNull(),
+    rewardId: text("reward_id").notNull(),
+    billId: text("bill_id").notNull(),
+    points: integer("points").notNull(),
+    discountPaise: integer("discount_paise").notNull().default(0),
+    /** held | committed | cancelled */
+    status: text("status").notNull().default("held"),
+    code: text("code").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    committedAt: timestamp("committed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("loyalty_redemptions_bill_idx").on(t.billId),
+    index("loyalty_redemptions_customer_idx").on(t.customerId),
+  ]
+);
+
+export const loyaltyBillLinks = pgTable("loyalty_bill_links", {
+  billId: text("bill_id").primaryKey(),
+  restaurantId: text("restaurant_id").notNull(),
+  customerId: text("customer_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});

@@ -1,8 +1,13 @@
+import "server-only";
+
+import { randomUUID } from "node:crypto";
+
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getDoc, listDocs, putDoc } from "@/server/modules/data/documents";
+
 /**
- * DEMO DATA STORE — Customer Feedback (Feature: Customer Feedback, Step 1).
- *
- * Same in-memory pattern as demo-store/store.ts: resets on server
- * restart, holds no real customer data. Feedback is always tied to a
+ * Customer feedback, persisted in PostgreSQL (one document per order, keyed
+ * by orderId, so an order can never receive feedback twice). Feedback is always tied to a
  * real orderId — never a table alone — so it can never be associated
  * with the wrong dining session.
  */
@@ -18,28 +23,27 @@ export type Feedback = {
   submittedAt: number;
 };
 
-const feedbackEntries: Feedback[] = [];
-let feedbackCounter = 0;
+const COLLECTION = "feedback";
 
-export function listFeedback(): Feedback[] {
-  return feedbackEntries.map((f) => ({ ...f }));
+export async function listFeedback(): Promise<Feedback[]> {
+  const docs = await listDocs<Feedback>(DEMO_RESTAURANT_ID, COLLECTION);
+  return docs.map((d) => d.data);
 }
 
-export function getFeedbackByOrderId(orderId: string): Feedback | null {
-  return feedbackEntries.find((f) => f.orderId === orderId) ?? null;
+export async function getFeedbackByOrderId(orderId: string): Promise<Feedback | null> {
+  return getDoc<Feedback>(DEMO_RESTAURANT_ID, COLLECTION, orderId);
 }
 
-export function submitFeedback(input: {
+export async function submitFeedback(input: {
   orderId: string;
   tableId: string;
   foodRating: number;
   serviceRating: number;
   orderingRating: number;
   comment: string | null;
-}): Feedback {
-  feedbackCounter += 1;
+}): Promise<Feedback> {
   const entry: Feedback = {
-    id: `f${feedbackCounter}`,
+    id: `f_${randomUUID()}`,
     orderId: input.orderId,
     tableId: input.tableId,
     foodRating: input.foodRating,
@@ -48,6 +52,6 @@ export function submitFeedback(input: {
     comment: input.comment,
     submittedAt: Date.now(),
   };
-  feedbackEntries.push(entry);
+  await putDoc(DEMO_RESTAURANT_ID, COLLECTION, input.orderId, entry);
   return entry;
 }

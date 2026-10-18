@@ -18,12 +18,12 @@ async function allowed(): Promise<boolean> {
 }
 
 /** Mirror "read" into the real notification store so the bell and the Notifications page agree. */
-function markReadInStore(ids: string[] | "all"): void {
-  for (const n of listFor("owner", null)) {
+async function markReadInStore(ids: string[] | "all"): Promise<void> {
+  for (const n of await listFor("owner", null)) {
     if (n.status !== "unread") continue;
 
     if (ids === "all" || ids.includes(n.id)) {
-      setStatus(n.id, "owner", "read");
+      await setStatus(n.id, "owner", "read");
     }
   }
 }
@@ -64,14 +64,14 @@ export async function POST(req: Request) {
 
   if (body.all === true) {
     await markNotificationsRead("all", BUSINESS_ID);
-    markReadInStore("all");
+    await markReadInStore("all");
   } else if (Array.isArray(body.ids)) {
     const ids = body.ids
       .filter((id): id is string => typeof id === "string")
       .slice(0, 100);
 
     await markNotificationsRead(ids, BUSINESS_ID);
-    markReadInStore(ids);
+    await markReadInStore(ids);
   } else {
     return new NextResponse("Bad request", { status: 400 });
   }

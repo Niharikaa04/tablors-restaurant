@@ -1,5 +1,7 @@
 "use client";
 
+import { BillReceipt } from "@/components/customer/device/bill-receipt";
+import { LoyaltyBox, type LoyaltyHandlers } from "@/components/customer/device/loyalty-box";
 import { QRCodeSVG } from "qrcode.react";
 import type { CustomerBillState } from "@/server/modules/customer/actions";
 
@@ -27,6 +29,7 @@ export function PaymentPanel({
   onConfirmUpi: _onConfirmUpi,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   confirmingUpi: _confirmingUpi,
+  loyalty,
 }: {
   bill: CustomerBillState | null;
   mode?: "bill" | "qr";
@@ -35,6 +38,7 @@ export function PaymentPanel({
   generatingBill?: boolean;
   onConfirmUpi?: (transactionId: string) => void;
   confirmingUpi?: boolean;
+  loyalty?: LoyaltyHandlers;
 }) {
   /*
    * No bill generated yet.
@@ -160,6 +164,12 @@ export function PaymentPanel({
               Close
             </button>
           </div>
+
+          <div className="mt-4">
+            <BillReceipt bill={bill} />
+          </div>
+
+          {loyalty && <LoyaltyBox bill={bill} handlers={loyalty} />}
 
           <div
             className="mt-5 rounded-xl border p-4"
@@ -485,19 +495,6 @@ export function PaymentPanel({
               )}
             </div>
 
-            {/* Open UPI app */}
-            {upiUri && (
-              <a
-                href={upiUri}
-                className="mt-3 block rounded-md py-3 text-center text-sm font-semibold"
-                style={{
-                  background: "var(--device-gold)",
-                  color: "#171a10",
-                }}
-              >
-                Open UPI App
-              </a>
-            )}
           </>
         )}
       </div>

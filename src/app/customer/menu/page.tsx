@@ -1,4 +1,5 @@
-import { getMenu } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getMenuDb } from "@/server/modules/data/menu-db";
 import { CustomerMenuView } from "@/components/customer/customer-menu-view";
 
 /**
@@ -8,8 +9,10 @@ import { CustomerMenuView } from "@/components/customer/customer-menu-view";
  * Menu data comes straight from the existing demo store; nothing is
  * invented or hardcoded here.
  */
-export default function CustomerMenuPage() {
-  const menu = getMenu();
+export const dynamic = "force-dynamic";
+
+export default async function CustomerMenuPage() {
+  const menu = await getMenuDb(DEMO_RESTAURANT_ID);
 
   return (
     <div>
@@ -18,7 +21,7 @@ export default function CustomerMenuPage() {
           Menu
         </h1>
         <p className="mt-1 text-sm text-[var(--tablor-text-muted)]">
-          Browse today&apos;s menu. Demo data — resets when the server restarts.
+          Browse today&apos;s menu.
         </p>
       </div>
 

@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getDemoRole } from "@/server/modules/auth/session";
-import { issueBill } from "@/server/modules/demo-store/store";
+import {
+  DEMO_RESTAURANT_ID,
+  getDemoRole,
+} from "@/server/modules/auth/session";
+import { issueBillDb } from "@/server/modules/billing/db-billing";
 
 /**
  * Billing is owner-only financial functionality. The role is checked here
@@ -85,11 +88,18 @@ export async function createBill(
     return back("invalid-discount");
   }
 
-  const result = issueBill(orderId.trim(), {
-    gstPercent,
-    serviceChargePercent,
-    discountRupees,
-  });
+  let result;
+
+  try {
+    result = await issueBillDb(DEMO_RESTAURANT_ID, orderId.trim(), {
+      gstPercent,
+      serviceChargePercent,
+      discountRupees,
+    });
+  } catch (err) {
+    console.error("createBill failed", err);
+    return back("invalid");
+  }
 
   // Revalidate on failure too, so a stale screen picks up the latest state.
   revalidateBillingSurfaces();

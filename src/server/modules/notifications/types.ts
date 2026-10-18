@@ -66,6 +66,18 @@ export const NOTIFICATION_TYPES = {
     priority: "high",
     autoResolve: true,
   },
+
+  OFFER_CREATED: {
+    roles: ["owner", "manager"],
+    priority: "low",
+    autoResolve: false,
+  },
+
+  LOYALTY_POINTS_EARNED: {
+    roles: ["owner", "manager"],
+    priority: "low",
+    autoResolve: false,
+  },
 } as const satisfies Record<
   string,
   {

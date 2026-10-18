@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { demoRequestSchema } from "./schema";
 import { checkRateLimit } from "./rate-limit";
-import { recordLead } from "@/server/modules/demo-store/store";
+import { recordLeadDb } from "@/server/modules/data/devices-db";
 
 export type SubmitDemoRequestState =
   | { status: "idle" }
@@ -69,7 +69,7 @@ export async function submitDemoRequest(
   // record into the in-memory demo store so the Company Admin demo can
   // show it, and log server-side. Nothing here is trusted from the
   // client beyond what Zod has already validated.
-  recordLead({
+  await recordLeadDb({
     restaurantName: parsed.data.restaurantName,
     ownerName: parsed.data.fullName,
     phone: parsed.data.phone,

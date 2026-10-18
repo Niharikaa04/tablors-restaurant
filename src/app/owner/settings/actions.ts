@@ -110,7 +110,7 @@ export async function saveSettingsAction(
     };
   }
 
-  saveSettings(session.restaurantId, parsed.data);
+  await saveSettings(session.restaurantId, parsed.data);
   revalidatePath("/owner/settings");
 
   return { ok: true };

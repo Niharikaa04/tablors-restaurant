@@ -6,6 +6,7 @@
 export const NOTIFICATION_TYPES = [
   "order_new", "payment_received", "item_unavailable", "table_reserved",
   "order_cancelled", "device_offline", "device_low_battery", "kitchen_order_delayed",
+  "offer_created", "loyalty_points_earned",
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 export type Severity = "info" | "warning" | "critical";
@@ -24,6 +25,8 @@ export const TYPE_META: Record<NotificationType, { title: string; severity: Seve
   device_offline: { title: "Device offline", severity: "critical", href: "/owner/devices" },
   device_low_battery: { title: "Device low battery", severity: "warning", href: "/owner/devices" },
   kitchen_order_delayed: { title: "Kitchen order delayed", severity: "critical", href: "/owner/orders" },
+  offer_created: { title: "New offer created", severity: "info", href: "/owner/offers" },
+  loyalty_points_earned: { title: "Loyalty points earned", severity: "info", href: "/owner/loyalty" },
 };
 
 export type NotificationLoader = (businessId: string) => StoredNotification[] | Promise<StoredNotification[]>;

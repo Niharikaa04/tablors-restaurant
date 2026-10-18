@@ -1,8 +1,11 @@
 import type { Bill } from "@/server/modules/demo-store/store";
-import { getPayments } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { listPaymentsDb } from "@/server/modules/billing/db-billing";
 import { DEMO_BUSINESS_ID, getPotsRuntime } from "@/server/modules/pots/runtime";
 import type { BillBreakdown } from "./core/loyalty";
 import { currentLoyaltyRule, getLoyaltyRuntime } from "./loyalty-runtime";
+import { settleLoyaltyForBillDb } from "@/server/modules/loyalty-db/db-loyalty";
+import { notify } from "@/server/modules/notifications/store";
 
 /**
  * Bridge from the existing billing/payment actions into the Pots ledger.
@@ -42,11 +45,28 @@ function readStorePayment(p: unknown): { id: string; billId: string; amountRupee
 /** Optional customer context. When the billing flow knows the loyalty member, pass it and points are credited automatically. */
 export interface LoyaltyContext { customerId: string; bill: BillBreakdown }
 
-export function onBillPaymentConfirmed(billId: string, method: NonNullable<Bill["paymentMethod"]>, loyalty?: LoyaltyContext): void {
+export async function onBillPaymentConfirmed(billId: string, method: NonNullable<Bill["paymentMethod"]>, loyalty?: LoyaltyContext): Promise<void> {
+  // Persistent loyalty ledger (points + reward commit). Independent of Pots,
+  // idempotent, and must never block the payment flow.
+  try {
+    const settled = await settleLoyaltyForBillDb(DEMO_RESTAURANT_ID, billId);
+    if (settled && settled.earned > 0) {
+      await notify({
+        type: "LOYALTY_POINTS_EARNED",
+        title: "Loyalty points earned",
+        message: `Member ${settled.phoneMasked} earned ${settled.earned} points (balance ${settled.balance}).`,
+        dedupeKey: `loyalty-earn:${billId}`,
+      });
+    }
+  } catch (error) {
+    console.error("[loyalty] settle failed for bill", billId, error);
+  }
+
   const rt = getPotsRuntime();
   const at = new Date();
   const paymentIds: string[] = [];
-  for (const raw of getPayments()) {
+  // Payments come from PostgreSQL (the source of truth), not process memory.
+  for (const raw of await listPaymentsDb(DEMO_RESTAURANT_ID)) {
     const p = readStorePayment(raw);
     if (!p || p.billId !== billId) continue;
     paymentIds.push(p.id);

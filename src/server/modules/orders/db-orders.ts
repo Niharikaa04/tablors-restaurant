@@ -7,6 +7,7 @@ import {
   asc,
   eq,
   inArray,
+  isNull,
   notInArray,
 } from "drizzle-orm";
 
@@ -106,6 +107,7 @@ export async function createOrderInDb(
           and(
             eq(restaurantTables.id, input.tableId),
             eq(restaurantTables.restaurantId, input.restaurantId),
+            isNull(restaurantTables.archivedAt),
           ),
         )
         .for("update");
@@ -316,7 +318,12 @@ export async function listTables(
   const rows = await db
     .select()
     .from(restaurantTables)
-    .where(eq(restaurantTables.restaurantId, restaurantId))
+    .where(
+      and(
+        eq(restaurantTables.restaurantId, restaurantId),
+        isNull(restaurantTables.archivedAt),
+      ),
+    )
     .orderBy(
       asc(restaurantTables.number),
       asc(restaurantTables.label),

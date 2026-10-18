@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { MenuItem } from "@/server/modules/demo-store/store";
 import { getEffectivePrice } from "@/lib/menu-shared";
 
@@ -16,18 +16,20 @@ export function MenuPane({
   selectedCode,
   onSelectItem,
   getQty,
+  pageIndex,
 }: {
   items: MenuItem[];
   selectedCode: string | null;
   onSelectItem: (item: MenuItem) => void;
   getQty: (code: string) => number;
+  /** Current page, controlled by the device (keypad ▲ ▼ arrows / keyboard). */
+  pageIndex: number;
 }) {
   const categories = useMemo(
     () => Array.from(new Set(items.map((item) => item.category))),
     [items]
   );
 
-  const [pageIndex, setPageIndex] = useState(0);
   const safePageIndex = Math.min(pageIndex, Math.max(categories.length - 1, 0));
   const activeCategory = categories[safePageIndex];
 
@@ -36,9 +38,6 @@ export function MenuPane({
     [items, activeCategory]
   );
 
-  function goTo(next: number) {
-    setPageIndex(Math.max(0, Math.min(categories.length - 1, next)));
-  }
 
   return (
     <div
@@ -50,7 +49,7 @@ export function MenuPane({
           className="shrink-0 rounded px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white"
           style={{ background: "var(--device-tag-red)" }}
         >
-          Page {safePageIndex + 1}
+          Page {safePageIndex + 1} / {Math.max(categories.length, 1)}
         </span>
         <h2
           className="truncate text-sm font-bold uppercase tracking-wide"
@@ -148,31 +147,6 @@ export function MenuPane({
         )}
       </div>
 
-      <div className="flex items-center justify-center gap-4 border-t border-[var(--device-paper-border)] py-2">
-        <button
-          type="button"
-          aria-label="Previous page"
-          onClick={() => goTo(safePageIndex - 1)}
-          disabled={safePageIndex === 0}
-          className="text-sm font-bold disabled:opacity-30"
-          style={{ color: "var(--device-paper-text)" }}
-        >
-          ◀
-        </button>
-        <span className="text-xs font-medium" style={{ color: "var(--device-paper-muted)" }}>
-          Page {safePageIndex + 1} / {categories.length}
-        </span>
-        <button
-          type="button"
-          aria-label="Next page"
-          onClick={() => goTo(safePageIndex + 1)}
-          disabled={safePageIndex === categories.length - 1}
-          className="text-sm font-bold disabled:opacity-30"
-          style={{ color: "var(--device-paper-text)" }}
-        >
-          ▶
-        </button>
-      </div>
     </div>
   );
 }

@@ -307,7 +307,7 @@ function DeviceLcdConfirmed() {
 
 function KitchenVisual() {
   const columns = [
-    { title: "NEW", action: "Accept" },
+    { title: "NEW", action: "Start preparing" },
     { title: "PREPARING", action: "Mark ready" },
     { title: "READY", action: "Mark served" },
   ];

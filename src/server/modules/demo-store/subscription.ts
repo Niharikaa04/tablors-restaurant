@@ -1,3 +1,7 @@
+import "server-only";
+
+import { getDoc, putDoc } from "@/server/modules/data/documents";
+
 /**
  * DEMO subscription store (in-memory).
  * PLAN PRICES / DEVICE LIMITS BELOW ARE PLACEHOLDERS - move them to config/DB
@@ -32,9 +36,6 @@ export interface Subscription {
   payments: PaymentRecord[];
 }
 
-const g = globalThis as unknown as { __tablorsSubs?: Map<string, Subscription> };
-const map = () => (g.__tablorsSubs ??= new Map());
-
 function seed(restaurantId: string): Subscription {
   return {
     restaurantId,
@@ -48,10 +49,20 @@ function seed(restaurantId: string): Subscription {
   };
 }
 
-export function getSubscription(restaurantId: string): Subscription {
-  const m = map();
-  if (!m.has(restaurantId)) m.set(restaurantId, seed(restaurantId));
-  const s = m.get(restaurantId)!;
+const COLLECTION = "subscription";
+const ID = "current";
+
+async function load(restaurantId: string): Promise<Subscription> {
+  const stored = await getDoc<Subscription>(restaurantId, COLLECTION, ID);
+  return stored ?? seed(restaurantId);
+}
+
+async function save(s: Subscription): Promise<void> {
+  await putDoc(s.restaurantId, COLLECTION, ID, s);
+}
+
+export async function getSubscription(restaurantId: string): Promise<Subscription> {
+  const s = await load(restaurantId);
   return { ...s, payments: [...s.payments] };
 }
 
@@ -60,11 +71,6 @@ export function deviceLimit(s: Subscription): number {
 }
 export function monthlyRupees(s: Subscription): number {
   return PLANS[s.plan].monthlyRupees + s.extraDevices * EXTRA_DEVICE_RUPEES;
-}
-
-function live(restaurantId: string): Subscription {
-  getSubscription(restaurantId);
-  return map().get(restaurantId)!;
 }
 
 function record(s: Subscription, description: string, amountRupees: number) {
@@ -79,27 +85,30 @@ function record(s: Subscription, description: string, amountRupees: number) {
   });
 }
 
-export function changePlan(restaurantId: string, plan: PlanId, devicesInUse: number): string | null {
-  const s = live(restaurantId);
+export async function changePlan(restaurantId: string, plan: PlanId, devicesInUse: number): Promise<string | null> {
+  const s = await load(restaurantId);
   if (s.plan === plan) return "You are already on that plan.";
   if (PLANS[plan].deviceLimit + s.extraDevices < devicesInUse) {
     return `You have ${devicesInUse} devices; that plan allows ${PLANS[plan].deviceLimit + s.extraDevices}. Remove devices first.`;
   }
   s.plan = plan;
+  await save(s);
   return null;
 }
 
-export function renew(restaurantId: string): void {
-  const s = live(restaurantId);
+export async function renew(restaurantId: string): Promise<void> {
+  const s = await load(restaurantId);
   const base = Math.max(new Date(s.renewalDate).getTime(), Date.now());
   const next = new Date(base);
   next.setMonth(next.getMonth() + 1);
   s.renewalDate = next.toISOString();
   record(s, `${PLANS[s.plan].name} plan - monthly renewal`, monthlyRupees(s));
+  await save(s);
 }
 
-export function addDevices(restaurantId: string, count: number): void {
-  const s = live(restaurantId);
+export async function addDevices(restaurantId: string, count: number): Promise<void> {
+  const s = await load(restaurantId);
   s.extraDevices += count;
   record(s, `Add ${count} device${count > 1 ? "s" : ""}`, count * EXTRA_DEVICE_RUPEES);
+  await save(s);
 }

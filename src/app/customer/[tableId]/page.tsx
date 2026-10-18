@@ -1,10 +1,16 @@
-import { getMenu, getTableById, getBillByOrderId, getOrder } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getBillByOrderIdDb } from "@/server/modules/billing/db-billing";
+import { getMenuDb } from "@/server/modules/data/menu-db";
+import { getTableByIdDb } from "@/server/modules/data/tables-db";
+import { getOrderFromDb } from "@/server/modules/orders/db-orders";
 import { getFeedbackByOrderId } from "@/server/modules/feedback/store";
 import { TableBanner } from "@/components/customer/table-banner";
 import { TableNotFound } from "@/components/customer/table-not-found";
 import { CartProvider } from "@/components/customer/cart-context";
 import { OrderCompletedPanel } from "@/components/customer/order-completed-panel";
 import { TablorDevice } from "@/components/customer/tablor-device";
+
+export const dynamic = "force-dynamic";
 
 export default async function CustomerTableMenuPage({
   params,
@@ -15,7 +21,7 @@ export default async function CustomerTableMenuPage({
 }) {
   const { tableId } = await params;
   const { order: trackedOrderId } = await searchParams;
-  const table = getTableById(tableId);
+  const table = await getTableByIdDb(DEMO_RESTAURANT_ID, tableId);
 
   if (!table) {
     return (
@@ -30,14 +36,14 @@ export default async function CustomerTableMenuPage({
   // never the table's "current" order, since the same table can be reused
   // by a different customer once this one is paid up.
   if (trackedOrderId) {
-    const trackedOrder = getOrder(trackedOrderId);
+    const trackedOrder = await getOrderFromDb(DEMO_RESTAURANT_ID, trackedOrderId);
 
     if (trackedOrder && trackedOrder.tableId === tableId) {
-      const bill = getBillByOrderId(trackedOrderId);
+      const bill = await getBillByOrderIdDb(DEMO_RESTAURANT_ID, trackedOrderId);
       const isPaid = Boolean(bill?.paymentMethod && bill?.paidAt);
 
       if (isPaid) {
-        const feedback = getFeedbackByOrderId(trackedOrderId);
+        const feedback = await getFeedbackByOrderId(trackedOrderId);
 
         return (
           <div>
@@ -55,7 +61,7 @@ export default async function CustomerTableMenuPage({
     }
   }
 
-  const menu = getMenu();
+  const menu = await getMenuDb(DEMO_RESTAURANT_ID);
 
   return (
     <CartProvider>

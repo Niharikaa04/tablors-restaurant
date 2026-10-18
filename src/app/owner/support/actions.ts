@@ -28,7 +28,7 @@ export async function createTicketAction(input: unknown): Promise<SupportActionR
   if (!session) return fail("You do not have access to support.");
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid input");
-  createTicket(session.restaurantId, parsed.data);
+  await createTicket(session.restaurantId, parsed.data);
   revalidatePath("/owner/support");
   return { ok: true };
 }
@@ -38,7 +38,7 @@ export async function replyTicketAction(id: unknown, text: unknown): Promise<Sup
   if (!session) return fail("You do not have access to support.");
   const p = z.object({ id: z.string().min(1).max(50), text: z.string().trim().min(1).max(2000) }).safeParse({ id, text });
   if (!p.success) return fail("Enter a message.");
-  if (!addTicketMessage(session.restaurantId, p.data.id, p.data.text)) return fail("Ticket not found or already resolved.");
+  if (!(await addTicketMessage(session.restaurantId, p.data.id, p.data.text))) return fail("Ticket not found or already resolved.");
   revalidatePath("/owner/support");
   return { ok: true };
 }
@@ -48,7 +48,7 @@ export async function closeTicketAction(id: unknown): Promise<SupportActionResul
   if (!session) return fail("You do not have access to support.");
   const p = z.string().min(1).max(50).safeParse(id);
   if (!p.success) return fail("Invalid ticket.");
-  if (!setTicketStatus(session.restaurantId, p.data, "resolved")) return fail("Ticket not found.");
+  if (!(await setTicketStatus(session.restaurantId, p.data, "resolved"))) return fail("Ticket not found.");
   revalidatePath("/owner/support");
   return { ok: true };
 }

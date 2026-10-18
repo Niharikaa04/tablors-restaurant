@@ -206,6 +206,9 @@ export type Bill = {
 
   paidAt: number | null;
 
+  /** When the bill was generated (ms); used to list bills by day. */
+  createdAt?: number;
+
 };
 
 
@@ -2489,6 +2492,8 @@ export type RecordPaymentInput = {
   amountRupees: unknown;
 
   transactionId?: unknown;
+
+  idempotencyKey?: unknown;
 
 };
 

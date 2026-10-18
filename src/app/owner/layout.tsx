@@ -8,6 +8,7 @@ import { demoLogout } from "@/server/modules/auth/demo-actions";
 import { Crown, LogOut } from "lucide-react";
 import { getSettings } from "@/server/modules/demo-store/settings";
 import { OwnerSidebarNav } from "./owner-sidebar-nav";
+import { NotificationToasts } from "./_components/notification-toasts";
 
 export default async function OwnerLayout({ children }: { children: ReactNode }) {
   const session = await getDemoSession();
@@ -25,7 +26,7 @@ export default async function OwnerLayout({ children }: { children: ReactNode })
     redirect(roleHome[session.role]);
   }
 
-  const settings = getSettings(session.restaurantId);
+  const settings = await getSettings(session.restaurantId);
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-black text-zinc-100 overflow-x-hidden">
@@ -92,6 +93,8 @@ export default async function OwnerLayout({ children }: { children: ReactNode })
           </div>
         </div>
       </aside>
+
+      <NotificationToasts />
 
       {/* Main Content Area */}
       <main className="flex-1 min-w-0 overflow-y-auto bg-black p-4 sm:p-8 lg:p-10">

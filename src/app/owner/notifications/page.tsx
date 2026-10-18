@@ -1,13 +1,15 @@
 // src/app/owner/notifications/page.tsx
 "use client";
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import { useNotifications } from "@/components/notifications/useNotifications";
 
 const FILTERS = ["ALL", "ORDER_NEW", "PAYMENT_RECEIVED", "ITEM_UNAVAILABLE", "TABLE_RESERVED",
   "ORDER_CANCELLED", "DEVICE_OFFLINE", "DEVICE_LOW_BATTERY", "KITCHEN_ORDER_DELAYED"];
 
 export default function NotificationsPage() {
-  const { items, setStatus } = useNotifications();
+  const { items, setStatus, remove } = useNotifications();
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [filter, setFilter] = useState("ALL");
   const shown = items.filter(n => filter === "ALL" || n.type === filter);
 
@@ -36,10 +38,29 @@ export default function NotificationsPage() {
               <p className="text-sm text-[#9DA194]">{n.message}</p>
               <p className="mt-1 text-xs text-[#9DA194]">{new Date(n.createdAt).toLocaleString()} · {n.status}</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               {n.status === "unread" && <button onClick={() => setStatus(n.id, "read")} className="text-sm text-[#D7FE3B]">Mark read</button>}
               {n.status !== "acknowledged" && n.status !== "resolved" &&
                 <button onClick={() => setStatus(n.id, "acknowledged")} className="text-sm text-[#D7FE3B]">Acknowledge</button>}
+              <button
+                type="button"
+                title="Delete notification"
+                aria-label={`Delete notification: ${n.title}`}
+                disabled={deleting === n.id}
+                onClick={async () => {
+                  setDeleting(n.id);
+                  try {
+                    await remove(n.id);
+                  } catch {
+                    /* stays in the list; try again */
+                  } finally {
+                    setDeleting(null);
+                  }
+                }}
+                className="rounded p-1 text-[#E27468] hover:bg-[#E27468]/10 disabled:opacity-40"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </button>
             </div>
           </li>
         ))}

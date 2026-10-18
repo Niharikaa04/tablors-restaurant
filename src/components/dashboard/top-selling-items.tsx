@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { getTopSellingItems } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getTopSellingItemsDb } from "@/server/modules/data/analytics-db";
 import { SectionHeader } from "./section-header";
 
-export function TopSellingItems() {
-  const items = getTopSellingItems(5);
+export async function TopSellingItems() {
+  const items = await getTopSellingItemsDb(DEMO_RESTAURANT_ID, 5);
   const max = Math.max(1, ...items.map((i) => i.qtySold));
 
   return (

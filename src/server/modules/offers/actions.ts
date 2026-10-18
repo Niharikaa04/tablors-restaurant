@@ -12,10 +12,9 @@ import {
   type OfferType,
   type OfferTargetType,
 } from "@/server/modules/offers/store";
-import {
-  getMenuItemById,
-  getMenu,
-} from "@/server/modules/demo-store/store";
+import { getMenuDb, getMenuItemByIdDb } from "@/server/modules/data/menu-db";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { notify } from "@/server/modules/notifications/store";
 
 const OfferSchema = z.object({
   name: z
@@ -147,7 +146,7 @@ function parseFormData(formData: FormData) {
   };
 }
 
-function validateBusinessRules(input: {
+async function validateBusinessRules(input: {
   type: OfferType;
   targetType: OfferTargetType;
   targetItemId: string | null;
@@ -206,7 +205,7 @@ function validateBusinessRules(input: {
       return "Select a menu item.";
     }
 
-    const item = getMenuItemById(input.targetItemId);
+    const item = await getMenuItemByIdDb(DEMO_RESTAURANT_ID, input.targetItemId);
 
     if (!item) {
       return "Selected menu item was not found.";
@@ -218,7 +217,7 @@ function validateBusinessRules(input: {
       return "Select a category.";
     }
 
-    const categoryExists = getMenu().some(
+    const categoryExists = (await getMenuDb(DEMO_RESTAURANT_ID)).some(
       (item) => item.category === input.targetCategory
     );
 
@@ -257,7 +256,7 @@ export async function createOfferAction(
     };
   }
 
-  const businessError = validateBusinessRules(parsed.data);
+  const businessError = await validateBusinessRules(parsed.data);
 
   if (businessError) {
     return {
@@ -266,7 +265,19 @@ export async function createOfferAction(
     };
   }
 
-  createOffer(parsed.data);
+  const created = await createOffer(parsed.data);
+
+  try {
+    // dedupeKey = offer id, so one offer can never raise two notifications.
+    await notify({
+      type: "OFFER_CREATED",
+      title: "New offer created",
+      message: `Offer "${created.name}" was created.`,
+      dedupeKey: `offer:${created.id}`,
+    });
+  } catch (error) {
+    console.error("Offer notification failed", created.id, error);
+  }
 
   revalidatePath("/owner/offers");
 
@@ -295,7 +306,7 @@ export async function updateOfferAction(
     };
   }
 
-  const businessError = validateBusinessRules(parsed.data);
+  const businessError = await validateBusinessRules(parsed.data);
 
   if (businessError) {
     return {
@@ -304,7 +315,7 @@ export async function updateOfferAction(
     };
   }
 
-  const updated = updateOffer(id, parsed.data);
+  const updated = await updateOffer(id, parsed.data);
 
   if (!updated) {
     return {
@@ -326,7 +337,7 @@ export async function deleteOfferAction(
 ): Promise<{ ok: boolean; message: string }> {
   await requirePermission("offers");
 
-  const deleted = deleteOffer(id);
+  const deleted = await deleteOffer(id);
 
   if (!deleted) {
     return {
@@ -349,7 +360,7 @@ export async function toggleOfferAction(
 ): Promise<{ ok: boolean; message: string }> {
   await requirePermission("offers");
 
-  const offer = setOfferActive(id, active);
+  const offer = await setOfferActive(id, active);
 
   if (!offer) {
     return {

@@ -2,19 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getDemoRole } from "@/server/modules/auth/session";
+import {
+  DEMO_RESTAURANT_ID,
+  getDemoRole,
+} from "@/server/modules/auth/session";
 
 import {
-  clearMenuItemImage,
-  createMenuItem,
-  deleteMenuItem,
-  getMenu,
-  getMenuItemById,
-  setItemAvailability,
-  setMenuItemImage,
-  updateMenuItem,
-  type MenuItem,
-} from "@/server/modules/demo-store/store";
+  clearMenuItemImageDb,
+  createMenuItemDb,
+  deleteMenuItemDb,
+  getMenuDb,
+  getMenuItemByIdDb,
+  setItemAvailabilityDb,
+  setMenuItemImageDb,
+  updateMenuItemDb,
+} from "@/server/modules/data/menu-db";
+import type { MenuItem } from "@/server/modules/demo-store/store";
 
 import {
   validateImageFile,
@@ -77,7 +80,7 @@ export async function toggleItemAvailability(
     };
   }
 
-  const item = setItemAvailability(code, nextAvailable);
+  const item = await setItemAvailabilityDb(DEMO_RESTAURANT_ID, code, nextAvailable);
 
   if (!item) {
     return {
@@ -98,7 +101,7 @@ export async function toggleItemAvailability(
    * ITEM_UNAVAILABLE notification
    */
   if (!nextAvailable) {
-    notify({
+    await notify({
       type: "ITEM_UNAVAILABLE",
       title: "Item unavailable",
       message: `${item.name} is now unavailable.`,
@@ -111,7 +114,7 @@ export async function toggleItemAvailability(
    * Resolve the existing notification.
    */
   if (nextAvailable) {
-    resolveByKey(`item-unavailable:${item.id}`);
+    await resolveByKey(`item-unavailable:${item.id}`);
   }
 
   revalidateMenuSurfaces();
@@ -278,7 +281,7 @@ export async function createMenuItemAction(
     };
   }
 
-  const active = getMenu();
+  const active = await getMenuDb(DEMO_RESTAURANT_ID);
 
   const parsed = validateMenuInput(
     readValues(formData),
@@ -317,7 +320,7 @@ export async function createMenuItemAction(
     };
   }
 
-  const result = createMenuItem(parsed.value);
+  const result = await createMenuItemDb(DEMO_RESTAURANT_ID, parsed.value);
 
   if (!result.ok) {
     if (result.reason === "duplicate-code") {
@@ -341,11 +344,13 @@ export async function createMenuItemAction(
   }
 
   if (image.kind === "set") {
-    setMenuItemImage(
+    const withImage = await setMenuItemImageDb(
+      DEMO_RESTAURANT_ID,
       result.item.id,
       image.mime,
       image.bytes,
     );
+    if (withImage) result.item = withImage;
   }
 
   await notifyDevicesOfMenuChange({
@@ -377,14 +382,14 @@ export async function updateMenuItemAction(
     };
   }
 
-  if (!getMenuItemById(id)) {
+  if (!(await getMenuItemByIdDb(DEMO_RESTAURANT_ID, id))) {
     return {
       ok: false,
       error: "That menu item no longer exists.",
     };
   }
 
-  const active = getMenu();
+  const active = await getMenuDb(DEMO_RESTAURANT_ID);
 
   const parsed = validateMenuInput(
     readValues(formData),
@@ -423,7 +428,8 @@ export async function updateMenuItemAction(
     };
   }
 
-  const result = updateMenuItem(
+  const result = await updateMenuItemDb(
+    DEMO_RESTAURANT_ID,
     id,
     parsed.value,
   );
@@ -450,13 +456,9 @@ export async function updateMenuItemAction(
   }
 
   if (image.kind === "set") {
-    setMenuItemImage(
-      id,
-      image.mime,
-      image.bytes,
-    );
+    await setMenuItemImageDb(DEMO_RESTAURANT_ID, id, image.mime, image.bytes);
   } else if (image.kind === "remove") {
-    clearMenuItemImage(id);
+    await clearMenuItemImageDb(DEMO_RESTAURANT_ID, id);
   }
 
   await notifyDevicesOfMenuChange({
@@ -487,7 +489,7 @@ export async function deleteMenuItemAction(
     };
   }
 
-  const result = deleteMenuItem(id);
+  const result = await deleteMenuItemDb(DEMO_RESTAURANT_ID, id);
 
   if (!result.ok) {
     return {

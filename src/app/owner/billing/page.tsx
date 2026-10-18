@@ -1,14 +1,20 @@
 import Link from "next/link";
+import { DayPicker } from "@/components/ui/day-picker";
+import { istDay, resolveDay, todayIst, yesterdayIst } from "@/lib/day";
+import { LiveRefresh } from "@/components/live/live-refresh";
 import { redirect } from "next/navigation";
 
 import { getDemoRole } from "@/server/modules/auth/session";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import {
+  getBillSummariesDb,
+  listBillsDb,
+} from "@/server/modules/billing/db-billing";
+import { getTablesDb } from "@/server/modules/data/tables-db";
+import { listActiveOrders } from "@/server/modules/orders/db-orders";
 import {
   BILL_LIMITS,
   DEFAULT_GST_PERCENT,
-  getBillPaymentSummary,
-  getBills,
-  getOrders,
-  getTables,
 } from "@/server/modules/demo-store/store";
 import { createBill } from "@/server/modules/billing/actions";
 
@@ -16,7 +22,7 @@ import { createBill } from "@/server/modules/billing/actions";
 export const dynamic = "force-dynamic";
 
 type PageProps = {
-  searchParams: Promise<{ notice?: string; bill?: string; tableId?: string }>;
+  searchParams: Promise<{ notice?: string; bill?: string; tableId?: string; date?: string }>;
 };
 
 type Notice = {
@@ -118,10 +124,17 @@ export default async function BillingPage({ searchParams }: PageProps) {
   // Only the owner may change anything; admin gets a read-only view.
   const canManage = role === "owner";
 
-  const { notice, bill: noticeBillId, tableId } = await searchParams;
+  const { notice, bill: noticeBillId, tableId, date } = await searchParams;
 
-  const tables = getTables();
-  const bills = getBills();
+  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
+  const bills = await listBillsDb(DEMO_RESTAURANT_ID);
+  const summaries = await getBillSummariesDb(DEMO_RESTAURANT_ID, bills);
+  const today = todayIst();
+  const selectedDay = resolveDay(date);
+  const dayBills = bills.filter(
+    (b) => b.createdAt === undefined || istDay(b.createdAt) === selectedDay
+  );
+  const getBillPaymentSummary = (b: (typeof bills)[number]) => summaries.get(b.id)!;
 
   const filterTable = tableId
     ? tables.find((t) => t.id === tableId) ?? null
@@ -129,7 +142,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
   // Only orders the owner has marked "Served" can be billed. Orders that
   // already have a bill are "billed", so they never appear here twice.
-  const billableOrders = getOrders().filter(
+  const billableOrders = (await listActiveOrders(DEMO_RESTAURANT_ID)).filter(
     (o) =>
       o.status === "served" && (filterTable ? o.tableId === filterTable.id : true)
   );
@@ -141,7 +154,9 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
   return (
     <div>
+      <LiveRefresh intervalMs={10000} />
       <h1 className="text-2xl text-[var(--color-text-primary)]">Billing</h1>
+      <DayPicker value={selectedDay} today={today} yesterday={yesterdayIst()} />
 
       {!canManage && (
         <p className="mt-2 text-xs text-[var(--color-text-muted)]">
@@ -334,18 +349,18 @@ export default async function BillingPage({ searchParams }: PageProps) {
             </thead>
 
             <tbody>
-              {bills.length === 0 && (
+              {dayBills.length === 0 && (
                 <tr>
                   <td
                     colSpan={9}
                     className="px-4 py-4 text-[var(--color-text-muted)]"
                   >
-                    No bills generated yet.
+                    {selectedDay === today ? "No bills generated yet today." : "No bills on this day."}
                   </td>
                 </tr>
               )}
 
-              {bills
+              {dayBills
                 .slice()
                 .reverse()
                 .map((bill) => {

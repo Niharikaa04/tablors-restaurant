@@ -1,3 +1,7 @@
+import "server-only";
+
+import { getDoc, putDoc } from "@/server/modules/data/documents";
+
 
 /** DEMO restaurant settings store (in-memory). Keyed by restaurantId. */
 
@@ -31,7 +35,7 @@ export interface RestaurantSettings {
   };
 }
 
-const defaults = (): RestaurantSettings => ({
+export const defaults = (): RestaurantSettings => ({
   name: "Demo Restaurant",
   logoDataUrl: null,
   address: "",
@@ -61,25 +65,28 @@ const defaults = (): RestaurantSettings => ({
   },
 });
 
-const g = globalThis as unknown as {
-  __tablorsSettings?: Map<string, RestaurantSettings>;
-};
+const COLLECTION = "settings";
+const ID = "restaurant";
 
-const map = () => (g.__tablorsSettings ??= new Map());
-
-export function getSettings(restaurantId: string): RestaurantSettings {
-  const m = map();
-
-  if (!m.has(restaurantId)) {
-    m.set(restaurantId, defaults());
-  }
-
-  return structuredClone(m.get(restaurantId)!);
+/** Saved settings merged over defaults, so newly added fields always exist. */
+export async function getSettings(
+  restaurantId: string,
+): Promise<RestaurantSettings> {
+  const stored = await getDoc<Partial<RestaurantSettings>>(restaurantId, COLLECTION, ID);
+  const base = defaults();
+  if (!stored) return base;
+  return {
+    ...base,
+    ...stored,
+    printer: { ...base.printer, ...stored.printer },
+    kitchen: { ...base.kitchen, ...stored.kitchen },
+    payment: { ...base.payment, ...stored.payment },
+  };
 }
 
-export function saveSettings(
+export async function saveSettings(
   restaurantId: string,
   next: RestaurantSettings,
-): void {
-  map().set(restaurantId, structuredClone(next));
+): Promise<void> {
+  await putDoc(restaurantId, COLLECTION, ID, next);
 }

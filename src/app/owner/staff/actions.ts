@@ -108,11 +108,11 @@ export async function addStaffAction(input: unknown): Promise<StaffActionResult>
     return fail("You are not allowed to assign that role.");
   }
   const contact = normalizeContact(data.contact);
-  if (isContactTaken(session.restaurantId, contact)) {
+  if (await isContactTaken(session.restaurantId, contact)) {
     return fail("A staff member with that email or phone already exists.");
   }
 
-  createStaff(session.restaurantId, { ...data, contact });
+  await createStaff(session.restaurantId, { ...data, contact });
   revalidatePath("/owner/staff");
   return { ok: true };
 }
@@ -130,7 +130,7 @@ async function updateMember(
 
   // Lookup is scoped to the session's restaurant, so another restaurant's
   // staff id simply "does not exist" here.
-  const member = getStaff(session.restaurantId, id.data);
+  const member = await getStaff(session.restaurantId, id.data);
   if (!member) return fail("Staff member not found.");
 
   if (!canActOnStaffRole(session.role, member.role)) {
@@ -144,15 +144,15 @@ async function updateMember(
     member.role === "owner" &&
     member.status === "active" &&
     ((patch.role !== undefined && patch.role !== "owner") || patch.status === "inactive");
-  if (losesActiveOwner && countActiveOwners(session.restaurantId) <= 1) {
+  if (losesActiveOwner && await countActiveOwners(session.restaurantId) <= 1) {
     return fail("There must always be at least one active Owner.");
   }
 
-  if (patch.contact !== undefined && isContactTaken(session.restaurantId, patch.contact, member.id)) {
+  if (patch.contact !== undefined && await isContactTaken(session.restaurantId, patch.contact, member.id)) {
     return fail("A staff member with that email or phone already exists.");
   }
 
-  updateStaff(session.restaurantId, member.id, patch);
+  await updateStaff(session.restaurantId, member.id, patch);
   revalidatePath("/owner/staff");
   return { ok: true };
 }
@@ -191,7 +191,7 @@ export async function deleteStaffAction(id: unknown): Promise<StaffActionResult>
   if (!parsedId.success) return fail("Invalid staff member.");
 
   // Scoped to the session's restaurant: another restaurant's id is "not found".
-  const member = getStaff(session.restaurantId, parsedId.data);
+  const member = await getStaff(session.restaurantId, parsedId.data);
   if (!member) return fail("Staff member not found.");
 
   if (!canActOnStaffRole(session.role, member.role)) {
@@ -200,12 +200,12 @@ export async function deleteStaffAction(id: unknown): Promise<StaffActionResult>
   if (
     member.role === "owner" &&
     member.status === "active" &&
-    countActiveOwners(session.restaurantId) <= 1
+    await countActiveOwners(session.restaurantId) <= 1
   ) {
     return fail("There must always be at least one active Owner.");
   }
 
-  deleteStaff(session.restaurantId, member.id);
+  await deleteStaff(session.restaurantId, member.id);
   revalidatePath("/owner/staff");
   return { ok: true };
 }
@@ -219,7 +219,7 @@ export async function addLeaveAction(staffId: unknown, input: unknown): Promise<
 
   const id = idSchema.safeParse(staffId);
   if (!id.success) return fail("Invalid staff member.");
-  const member = getStaff(session.restaurantId, id.data);
+  const member = await getStaff(session.restaurantId, id.data);
   if (!member) return fail("Staff member not found.");
   if (!canActOnStaffRole(session.role, member.role)) {
     return fail("You are not allowed to record leave for this staff member.");
@@ -235,11 +235,11 @@ export async function addLeaveAction(staffId: unknown, input: unknown): Promise<
       86_400_000 +
     1;
   if (days > 366) return fail("A single leave can't be longer than a year.");
-  if (hasLeaveOverlap(session.restaurantId, member.id, data.from, data.to)) {
+  if (await hasLeaveOverlap(session.restaurantId, member.id, data.from, data.to)) {
     return fail("This overlaps with another leave for the same person.");
   }
 
-  addLeave(session.restaurantId, { staffId: member.id, ...data });
+  await addLeave(session.restaurantId, { staffId: member.id, ...data });
   revalidatePath("/owner/staff");
   return { ok: true };
 }
@@ -251,10 +251,10 @@ export async function cancelLeaveAction(leaveId: unknown): Promise<StaffActionRe
 
   const id = idSchema.safeParse(leaveId);
   if (!id.success) return fail("Invalid leave.");
-  const leave = getLeave(session.restaurantId, id.data);
+  const leave = await getLeave(session.restaurantId, id.data);
   if (!leave) return fail("Leave not found.");
 
-  const member = getStaff(session.restaurantId, leave.staffId);
+  const member = await getStaff(session.restaurantId, leave.staffId);
   if (!member || !canActOnStaffRole(session.role, member.role)) {
     return fail("You are not allowed to change this leave.");
   }
@@ -262,7 +262,7 @@ export async function cancelLeaveAction(leaveId: unknown): Promise<StaffActionRe
     return fail("Past leaves are kept as history and can't be removed.");
   }
 
-  deleteLeave(session.restaurantId, leave.id);
+  await deleteLeave(session.restaurantId, leave.id);
   revalidatePath("/owner/staff");
   return { ok: true };
 }

@@ -33,9 +33,9 @@ export default async function StaffPage() {
   }
 
   const today = todayInIndia();
-  const allLeaves = listLeaves(session.restaurantId);
+  const allLeaves = await listLeaves(session.restaurantId);
 
-  const rows: StaffRow[] = listStaff(session.restaurantId).map((m) => {
+  const rows: StaffRow[] = (await listStaff(session.restaurantId)).map((m) => {
     const leaves: LeaveRow[] = allLeaves
       .filter((l) => l.staffId === m.id)
       .map((l) => ({

@@ -1,13 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { reverseLoyaltyForRefundDb } from "@/server/modules/loyalty-db/db-loyalty";
 import { redirect } from "next/navigation";
 
-import { getDemoRole } from "@/server/modules/auth/session";
 import {
-  recordBillPayment,
-  refundPayment,
-} from "@/server/modules/demo-store/store";
+  DEMO_RESTAURANT_ID,
+  getDemoRole,
+} from "@/server/modules/auth/session";
+import {
+  recordBillPaymentDb,
+  refundPaymentDb,
+} from "@/server/modules/billing/db-billing";
 import { notify } from "@/server/modules/notifications/store";
 import {
   onBillPaymentConfirmed,
@@ -147,11 +151,19 @@ export async function recordPaymentAction(
   const amount = readNumber(formData, "amountRupees");
   if (amount === null) return back("invalid-amount", billId);
 
-  const result = recordBillPayment(billId, {
-    method,
-    amountRupees: amount,
-    transactionId: formData.get("transactionId"),
-  });
+  let result;
+
+  try {
+    result = await recordBillPaymentDb(DEMO_RESTAURANT_ID, billId, {
+      method,
+      amountRupees: amount,
+      transactionId: formData.get("transactionId"),
+      idempotencyKey: formData.get("idempotencyKey"),
+    });
+  } catch (err) {
+    console.error("recordPaymentAction failed", err);
+    return back("invalid", billId);
+  }
 
   revalidatePaymentSurfaces();
 
@@ -163,7 +175,7 @@ export async function recordPaymentAction(
     const table = tableText(result.bill);
     const paidAt = paymentDateTime(new Date());
 
-    notify({
+    await notify({
       type: "PAYMENT_RECEIVED",
       title: table ? `Payment received — ${table}` : "Payment received",
       message:
@@ -180,7 +192,7 @@ export async function recordPaymentAction(
     result.bill.totalRupees > 0
   ) {
     try {
-      onBillPaymentConfirmed(
+      await onBillPaymentConfirmed(
         result.bill.id,
         result.bill.paymentMethod,
       );
@@ -204,12 +216,25 @@ export async function refundPaymentAction(
   if (amount === null) return back("refund-invalid-amount");
 
   const reason = readText(formData, "reason");
-  const result = refundPayment(paymentId, amount, reason);
+  let result;
+
+  try {
+    result = await refundPaymentDb(DEMO_RESTAURANT_ID, paymentId, amount, reason);
+  } catch (err) {
+    console.error("refundPaymentAction failed", err);
+    return back("invalid");
+  }
 
   revalidatePaymentSurfaces();
 
   if (!result.ok) {
     return back(refundFailureCode(result.reason));
+  }
+
+  try {
+    await reverseLoyaltyForRefundDb(DEMO_RESTAURANT_ID, result.refund.billId);
+  } catch (error) {
+    console.error("Loyalty reversal failed for payment", paymentId, error);
   }
 
   try {

@@ -14,8 +14,8 @@ import { getSettings } from "@/server/modules/demo-store/settings";
  * the app (marketing/owner/kitchen) is unaffected.
  */
 // Customer pages have no login, so the restaurant id comes from the server (demo: single restaurant).
-export default function CustomerLayout({ children }: { children: ReactNode }) {
-  const settings = getSettings(DEMO_RESTAURANT_ID);
+export default async function CustomerLayout({ children }: { children: ReactNode }) {
+  const settings = await getSettings(DEMO_RESTAURANT_ID);
 
   return (
     <div className="tablor-customer min-h-screen">

@@ -17,7 +17,7 @@ function Stars({ n }: { n: number }) {
 
 export default async function FeedbackPage() {
   await requirePermission("feedback");
-  const d = getFeedbackInsights();
+  const d = await getFeedbackInsights();
 
   return (
     <div className="space-y-6">

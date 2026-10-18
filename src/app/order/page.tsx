@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
-import { getTables } from "@/server/modules/demo-store/store";
+import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
+import { getTablesDb } from "@/server/modules/data/tables-db";
 import { TablePicker } from "@/components/order/table-picker";
 
 export const metadata: Metadata = {
   title: "Choose Your Table — Tablor's",
 };
 
-export default function OrderTableSelectionPage() {
-  const tables = getTables();
+export const dynamic = "force-dynamic";
+
+export default async function OrderTableSelectionPage() {
+  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
 
   return (
     <div className="tablor-customer min-h-screen">

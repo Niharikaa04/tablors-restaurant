@@ -17,6 +17,8 @@ const HREF: Record<string, string> = {
   DEVICE_OFFLINE: "/owner/devices",
   DEVICE_LOW_BATTERY: "/owner/devices",
   KITCHEN_ORDER_DELAYED: "/owner/orders",
+  OFFER_CREATED: "/owner/offers",
+  LOYALTY_POINTS_EARNED: "/owner/loyalty",
 };
 
 function ago(d: string | number | Date): string {
