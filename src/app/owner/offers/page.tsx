@@ -150,11 +150,11 @@ function offerValueLabel(
 
 export default async function OffersPage() {
 
-  const now = await getOffersPageNow();
-
-  const offers = await getOffers();
-
-  const menu = await getMenuDb(DEMO_RESTAURANT_ID);
+  const [now, offers, menu] = await Promise.all([
+    getOffersPageNow(),
+    getOffers(),
+    getMenuDb(DEMO_RESTAURANT_ID),
+  ]);
 
 
 

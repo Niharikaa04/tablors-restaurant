@@ -2,11 +2,11 @@ import Image from "next/image";
 
 /*
  * Single source of truth for the Tablor's countertop ordering terminal photo.
- * width/height are the real pixel size of public/images/tablor-ordering-device.png
+ * width/height are the real pixel size of public/images/tablor-ordering-device.webp
  * (the cropped file). If you swap in a higher-resolution original, update them.
  */
 export const DEVICE_IMAGE = {
-  src: "/images/tablor-ordering-device.png",
+  src: "/images/tablor-ordering-device.webp",
   width: 787,
   height: 399,
   alt: "Tablor's countertop ordering terminal with a numeric keypad, dedicated order buttons, a built-in LCD order display and a telephone-style handset",

@@ -41,7 +41,7 @@ export function OpenDevice() {
     >
       <div className="mkt-container">
         <Reveal className="max-w-2xl">
-          <p className="text-xs uppercase tracking-[0.3em] text-[var(--mkt-gold)]">
+          <p className="text-xs uppercase tracking-[0.3em] text-[var(--mkt-lime)]">
             The device
           </p>
           <h2
@@ -59,7 +59,7 @@ export function OpenDevice() {
         <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-center lg:gap-14">
           <Reveal
             delay={0.1}
-            className="relative mx-auto w-full max-w-2xl rounded-2xl border border-[var(--mkt-gold-soft)]/40 bg-[#07080c] p-3 shadow-[0_40px_90px_-30px_rgba(0,0,0,0.9)] sm:p-5"
+            className="relative mx-auto w-full max-w-2xl rounded-2xl border border-[var(--mkt-lime-dim)]/40 bg-[#07080c] p-3 shadow-[0_40px_90px_-30px_rgba(0,0,0,0.9)] sm:p-5"
           >
             <TablorDeviceImage sizes="(min-width: 1024px) 50vw, 92vw" />
           </Reveal>
@@ -84,7 +84,7 @@ export function OpenDevice() {
             <ol className="mt-6 space-y-3">
               {steps.map((s, i) => (
                 <li key={s} className="flex items-start gap-3 text-sm text-[var(--mkt-text-secondary)]">
-                  <span className="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--mkt-gold-soft)]/50 text-xs text-[var(--mkt-gold)]">
+                  <span className="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--mkt-lime-dim)]/50 text-xs text-[var(--mkt-lime)]">
                     {i + 1}
                   </span>
                   <span>{s}</span>

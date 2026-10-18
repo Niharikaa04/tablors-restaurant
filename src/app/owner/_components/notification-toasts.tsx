@@ -13,7 +13,7 @@ type Item = {
   severity: "info" | "warning" | "critical";
 };
 
-const POLL_MS = 5_000;
+const POLL_MS = 8_000;
 const SHOW_MS = 9_000;
 const SEEN_KEY = "tablor:toasts-seen";
 
@@ -109,15 +109,12 @@ export function NotificationToasts() {
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    // The server pushes an event when a notification is created; poll right away.
-    const es = new EventSource("/api/notifications/stream");
-    es.onmessage = () => void load();
-
+    // Polling only: a second always-open stream per tab keeps a serverless
+    // function busy and queries the database every few seconds for nothing.
     const pending = timers.current;
     return () => {
       clearInterval(tick);
       document.removeEventListener("visibilitychange", onVisible);
-      es.close();
       pending.forEach((t) => clearTimeout(t));
       pending.clear();
     };

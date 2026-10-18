@@ -10,9 +10,10 @@ type RevealProps = {
   delay?: number;
   /** Vertical travel distance in px. */
   y?: number;
-  /** Re-play the animation every time the section re-enters the viewport
-   *  (both scrolling down and scrolling back up). Defaults to true so the
-   *  landing page feels alive in both scroll directions. */
+  /** Re-play the animation every time the section re-enters the viewport.
+   *  Off by default: replaying makes sections near the bottom of the page
+   *  flicker, because sliding the element changes whether it counts as
+   *  "in view", which re-triggers the animation in a loop. */
   repeat?: boolean;
   /** Fraction of the element that must be visible before it animates in. */
   amount?: number;
@@ -28,7 +29,7 @@ export function Reveal({
   className,
   delay = 0,
   y = 28,
-  repeat = true,
+  repeat = false,
   amount = 0.25,
 }: RevealProps) {
   const reduceMotion = useReducedMotion();
@@ -43,7 +44,7 @@ export function Reveal({
       className={className}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: !repeat, amount, margin: "-10% 0px -10% 0px" }}
+      viewport={{ once: !repeat, amount, margin: "0px 0px -8% 0px" }}
       variants={variants}
       transition={{
         duration: reduceMotion ? 0.01 : 0.7,

@@ -12,13 +12,13 @@ import { VenueWalkthrough } from "./venue-walkthrough";
  * After converting the photos to JPG, change ".png" to ".jpg" below.
  */
 const venues = [
-  { name: "Restaurants", blurb: "Streamlined ordering for a better dining experience.", image: "/images/restaurant.png", position: "center" },
-  { name: "Trains", blurb: "Convenient onboard ordering for a smoother journey.", image: "/images/train.png", position: "center" },
-  { name: "Hotel Room Service", blurb: "Let guests request food and service directly from their room.", image: "/images/hotel.png", position: "center" },
-  { name: "Theatres", blurb: "Make food and refreshment ordering easy during every show.", image: "/images/theatre.png", position: "center" },
-  { name: "Hospitals", blurb: "Simplify meal ordering and service for patients and visitors.", image: "/images/hospital.png", position: "center" },
-  { name: "Airport Lounges", blurb: "Offer convenient dining and refreshments while guests wait for their flight.", image: "/images/airport.png", position: "center" },
-  { name: "SPA Salon", blurb: "Let guests book services and order refreshments without leaving their seat.", image: "/images/saloon.png", position: "center" },
+  { name: "Restaurants", blurb: "Streamlined ordering for a better dining experience.", image: "/images/restaurant.webp", position: "center" },
+  { name: "Trains", blurb: "Convenient onboard ordering for a smoother journey.", image: "/images/train.webp", position: "center" },
+  { name: "Hotel Room Service", blurb: "Let guests request food and service directly from their room.", image: "/images/hotel.webp", position: "center" },
+  { name: "Theatres", blurb: "Make food and refreshment ordering easy during every show.", image: "/images/theatre.webp", position: "center" },
+  { name: "Hospitals", blurb: "Simplify meal ordering and service for patients and visitors.", image: "/images/hospital.webp", position: "center" },
+  { name: "Airport Lounges", blurb: "Offer convenient dining and refreshments while guests wait for their flight.", image: "/images/airport.webp", position: "center" },
+  { name: "SPA Salon", blurb: "Let guests book services and order refreshments without leaving their seat.", image: "/images/saloon.webp", position: "center" },
 ] as const;
 
 type VenueName = (typeof venues)[number]["name"];
@@ -113,11 +113,11 @@ export function BusinessTypes() {
                       if (e.currentTarget.matches(":focus-visible")) setFocused(v.name);
                     }}
                     onBlur={() => setFocused(null)}
-                    className={`group relative block aspect-[4/3] w-full overflow-hidden rounded-md border text-left transition-[transform,box-shadow,border-color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--mkt-gold)] motion-reduce:scale-100 motion-reduce:transition-none ${
+                    className={`group relative block aspect-[4/3] w-full overflow-hidden rounded-md border text-left transition-[transform,box-shadow,border-color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--mkt-lime)] motion-reduce:scale-100 motion-reduce:transition-none ${
                       isLead
-                        ? `scale-[1.045] border-[var(--mkt-gold)] ${SHADOW_LEAD}`
+                        ? `scale-[1.045] border-[var(--mkt-lime)] ${SHADOW_LEAD}`
                         : isActive
-                          ? `scale-100 border-[var(--mkt-gold)]/70 ${SHADOW_ACTIVE}`
+                          ? `scale-100 border-[var(--mkt-lime)]/70 ${SHADOW_ACTIVE}`
                           : "scale-100 border-[var(--mkt-border)] shadow-none"
                     }`}
                   >
@@ -177,8 +177,8 @@ export function BusinessTypes() {
                         aria-hidden="true"
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,color,opacity,transform] duration-500 motion-reduce:transition-none ${
                           isLead || isActive
-                            ? "translate-x-0 border-[var(--mkt-gold)] bg-[var(--mkt-gold)] text-[var(--mkt-lime-ink)] opacity-100"
-                            : "-translate-x-0.5 border-[var(--mkt-gold)]/45 text-[var(--mkt-gold)] opacity-70"
+                            ? "translate-x-0 border-[var(--mkt-lime)] bg-[var(--mkt-lime)] text-[var(--mkt-lime-ink)] opacity-100"
+                            : "-translate-x-0.5 border-[var(--mkt-lime)]/45 text-[var(--mkt-lime)] opacity-70"
                         }`}
                       >
                         <svg

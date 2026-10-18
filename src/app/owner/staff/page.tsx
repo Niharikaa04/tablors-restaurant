@@ -33,9 +33,12 @@ export default async function StaffPage() {
   }
 
   const today = todayInIndia();
-  const allLeaves = await listLeaves(session.restaurantId);
+  const [allLeaves, staffList] = await Promise.all([
+    listLeaves(session.restaurantId),
+    listStaff(session.restaurantId),
+  ]);
 
-  const rows: StaffRow[] = (await listStaff(session.restaurantId)).map((m) => {
+  const rows: StaffRow[] = staffList.map((m) => {
     const leaves: LeaveRow[] = allLeaves
       .filter((l) => l.staffId === m.id)
       .map((l) => ({

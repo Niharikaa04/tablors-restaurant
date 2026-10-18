@@ -16,11 +16,15 @@ export default async function MenuPage({
   searchParams: Promise<{ category?: string }>;
 }) {
   const { category } = await searchParams;
+  const [items, usage] = await Promise.all([
+    getMenuDb(DEMO_RESTAURANT_ID),
+    getMenuItemUsageDb(DEMO_RESTAURANT_ID),
+  ]);
 
   return (
     <MenuManager
-      items={await getMenuDb(DEMO_RESTAURANT_ID)}
-      usage={await getMenuItemUsageDb(DEMO_RESTAURANT_ID)}
+      items={items}
+      usage={usage}
       initialCategory={category ?? null}
     />
   );

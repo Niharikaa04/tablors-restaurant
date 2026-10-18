@@ -21,7 +21,11 @@ export default async function CustomerTableMenuPage({
 }) {
   const { tableId } = await params;
   const { order: trackedOrderId } = await searchParams;
-  const table = await getTableByIdDb(DEMO_RESTAURANT_ID, tableId);
+  // Table and menu don't depend on each other: fetch together.
+  const [table, menu] = await Promise.all([
+    getTableByIdDb(DEMO_RESTAURANT_ID, tableId),
+    getMenuDb(DEMO_RESTAURANT_ID),
+  ]);
 
   if (!table) {
     return (
@@ -60,8 +64,6 @@ export default async function CustomerTableMenuPage({
       }
     }
   }
-
-  const menu = await getMenuDb(DEMO_RESTAURANT_ID);
 
   return (
     <CartProvider>

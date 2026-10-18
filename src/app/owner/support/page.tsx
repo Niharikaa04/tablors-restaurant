@@ -8,9 +8,11 @@ const fmt = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", dateSty
 
 export default async function SupportPage() {
   const session = await requirePermission("support");
-  const tables = await getTablesDb(session.restaurantId);
-  const ticketList = await listTickets(session.restaurantId);
-  const deviceList = await getDevicesDb(session.restaurantId);
+  const [tables, ticketList, deviceList] = await Promise.all([
+    getTablesDb(session.restaurantId),
+    listTickets(session.restaurantId),
+    getDevicesDb(session.restaurantId),
+  ]);
 
   const tickets: TicketRow[] = ticketList.map((t) => ({
     id: t.id,

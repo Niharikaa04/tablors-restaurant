@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "motion/react";
 
-const FRONT_SRC = "/images/tablor-ordering-device-front.png";
-const BACK_SRC = "/images/tablor-ordering-device-back.png";
+const FRONT_SRC = "/images/tablor-ordering-device-front.webp";
+const BACK_SRC = "/images/tablor-ordering-device-back.webp";
 /** width / height of the front image. Set from the real file. */
 const ASPECT = 2;
 
@@ -116,7 +116,7 @@ export function VenueWalkthrough({
   const move = { duration: reduce ? 0.01 : 0.7, ease: [0.16, 1, 0.3, 1] as const };
 
   const arrow =
-    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--mkt-gold)]/60 text-[var(--mkt-gold)] transition-colors hover:bg-[var(--mkt-gold)] hover:text-[var(--mkt-lime-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mkt-gold)] disabled:pointer-events-none disabled:opacity-30 motion-reduce:transition-none";
+    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--mkt-lime)]/60 text-[var(--mkt-lime)] transition-colors hover:bg-[var(--mkt-lime)] hover:text-[var(--mkt-lime-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mkt-lime)] disabled:pointer-events-none disabled:opacity-30 motion-reduce:transition-none";
 
   return (
     <dialog
@@ -130,12 +130,12 @@ export function VenueWalkthrough({
         if (e.key === "ArrowRight") next();
         if (e.key === "ArrowLeft") prev();
       }}
-      className="m-auto w-[min(96vw,60rem)] max-h-[96svh] overflow-y-auto rounded-xl border border-[var(--mkt-gold)]/40 bg-[var(--mkt-stage)] p-0 text-[var(--mkt-text-primary)] shadow-[0_40px_120px_-20px_rgba(0,0,0,0.95)] backdrop:bg-black/80"
+      className="m-auto w-[min(96vw,60rem)] max-h-[96svh] overflow-y-auto rounded-xl border border-[var(--mkt-lime)]/40 bg-[var(--mkt-stage)] p-0 text-[var(--mkt-text-primary)] shadow-[0_40px_120px_-20px_rgba(0,0,0,0.95)] backdrop:bg-black/80"
     >
       {venue && (
         <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between gap-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-[var(--mkt-gold)]">
+            <p className="text-xs uppercase tracking-[0.3em] text-[var(--mkt-lime)]">
               Tablor&apos;s for {venue.name}
             </p>
             <button

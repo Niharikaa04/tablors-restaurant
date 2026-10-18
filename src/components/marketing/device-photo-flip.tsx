@@ -5,8 +5,8 @@ import { useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import Image from "next/image";
 
-const FRONT = "/images/tablor-ordering-device-front.png";
-const BACK = "/images/tablor-ordering-device-back.png";
+const FRONT = "/images/tablor-ordering-device-front.webp";
+const BACK = "/images/tablor-ordering-device-back.webp";
 
 export function DevicePhotoFlip({
   className = "",

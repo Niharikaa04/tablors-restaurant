@@ -30,8 +30,8 @@ const DEVICE_ASPECT = 2;
 /** Where the push zooms toward, in % of the device box (roughly the screen). */
 const PUSH_ORIGIN = "62% 55%";
 
-const FRONT_SRC = "/images/tablor-ordering-device-front.png";
-const BACK_SRC = "/images/tablor-ordering-device-back.png";
+const FRONT_SRC = "/images/tablor-ordering-device-front.webp";
+const BACK_SRC = "/images/tablor-ordering-device-back.webp";
 
 const FADE_MS = 500;
 /** Length of the push toward the screen, then the gate fades. */
@@ -202,6 +202,7 @@ export function TablorOpening() {
           width={120}
           height={120}
           priority
+          style={{ height: "auto" }}
           className="col-start-1 h-10 w-auto justify-self-start rounded-md sm:h-12"
         />
         <span

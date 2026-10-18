@@ -20,7 +20,7 @@ import { SAMPLE_GST_PERCENT, sampleLines, sampleTotal } from "./product-story-da
 const nodes = [
   { id: "device", kicker: "01 · The table", caption: "Confirmed on the device", dot: "var(--mkt-lime)" },
   { id: "kitchen", kicker: "02 · The kitchen", caption: "Cooking from the same ticket", dot: "var(--color-radium-500)" },
-  { id: "owner", kicker: "03 · The owner", caption: "Closed on the dashboard", dot: "var(--color-gold-500)" },
+  { id: "owner", kicker: "03 · The owner", caption: "Closed on the dashboard", dot: "var(--mkt-lime)" },
 ] as const;
 
 function DeviceNode() {
@@ -91,7 +91,7 @@ function OwnerNode() {
   return (
     <div className="flex h-full flex-col rounded-xl border p-3" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-1)" }}>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-[0.2em]" style={{ color: "var(--color-gold-500)" }}>
+        <span className="text-[10px] uppercase tracking-[0.2em]" style={{ color: "var(--mkt-lime)" }}>
           Owner dashboard
         </span>
       </div>

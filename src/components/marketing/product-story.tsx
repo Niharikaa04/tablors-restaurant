@@ -340,7 +340,7 @@ function KitchenVisual() {
               </ul>
               <p
                 className="mt-2 rounded-md py-1 text-center text-[9px] font-medium"
-                style={{ background: "var(--color-gold-500)", color: "#0a0a0a" }}
+                style={{ background: "var(--mkt-lime)", color: "#0a0a0a" }}
               >
                 {column.action}
               </p>

@@ -69,16 +69,14 @@ export default async function ReportsPage({
   }
 
   const period = parseReportPeriod((await searchParams).period);
-  const r = buildSalesReport(
-    {
-      orders: await listAllOrders(DEMO_RESTAURANT_ID),
-      bills: await listBillsDb(DEMO_RESTAURANT_ID),
-      payments: await listPaymentsDb(DEMO_RESTAURANT_ID),
-      refunds: await listRefundsDb(DEMO_RESTAURANT_ID),
-      tables: await getTablesDb(DEMO_RESTAURANT_ID),
-    },
-    period
-  );
+  const [orders, bills, payments, refunds, tables] = await Promise.all([
+    listAllOrders(DEMO_RESTAURANT_ID),
+    listBillsDb(DEMO_RESTAURANT_ID),
+    listPaymentsDb(DEMO_RESTAURANT_ID),
+    listRefundsDb(DEMO_RESTAURANT_ID),
+    getTablesDb(DEMO_RESTAURANT_ID),
+  ]);
+  const r = buildSalesReport({ orders, bills, payments, refunds, tables }, period);
   const o = r.overview;
   const maxHour = Math.max(1, ...r.hourly.map((h) => h.orders));
   const firstHour = r.hourly.findIndex((h) => h.orders > 0);

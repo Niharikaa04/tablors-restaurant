@@ -14,9 +14,12 @@ export default async function KitchenPage() {
     redirect("/login");
   }
 
-  const orders = await listActiveOrders(DEMO_RESTAURANT_ID);
-  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
-  const menu = await getMenuIncludingArchivedDb(DEMO_RESTAURANT_ID);
+  // Independent queries run together, not one after another.
+  const [orders, tables, menu] = await Promise.all([
+    listActiveOrders(DEMO_RESTAURANT_ID),
+    getTablesDb(DEMO_RESTAURANT_ID),
+    getMenuIncludingArchivedDb(DEMO_RESTAURANT_ID),
+  ]);
 
   return (
     <>

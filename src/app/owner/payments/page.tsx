@@ -203,14 +203,17 @@ export default async function PaymentsPage({
     typeof notice === "string" ? notice : undefined,
   );
 
-  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
-  const bills = await listBillsDb(DEMO_RESTAURANT_ID);
-  const payments = await listPaymentsDb(DEMO_RESTAURANT_ID);
-  const refunds = await listRefundsDb(DEMO_RESTAURANT_ID);
+  // Independent queries run together; summaries need `bills`, so they follow.
+  const [tables, bills, payments, refunds, collection] = await Promise.all([
+    getTablesDb(DEMO_RESTAURANT_ID),
+    listBillsDb(DEMO_RESTAURANT_ID),
+    listPaymentsDb(DEMO_RESTAURANT_ID),
+    listRefundsDb(DEMO_RESTAURANT_ID),
+    getDailyCollectionDb(DEMO_RESTAURANT_ID),
+  ]);
   const today = todayIst();
   const selectedDay = resolveDay(date);
   const dayPayments = payments.filter((p) => istDay(p.paidAt) === selectedDay);
-  const collection = await getDailyCollectionDb(DEMO_RESTAURANT_ID);
   const summaries = await getBillSummariesDb(DEMO_RESTAURANT_ID, bills);
   const getBillPaymentSummary = (b: (typeof bills)[number]) => summaries.get(b.id)!;
 

@@ -126,8 +126,11 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
   const { notice, bill: noticeBillId, tableId, date } = await searchParams;
 
-  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
-  const bills = await listBillsDb(DEMO_RESTAURANT_ID);
+  const [tables, bills, activeOrders] = await Promise.all([
+    getTablesDb(DEMO_RESTAURANT_ID),
+    listBillsDb(DEMO_RESTAURANT_ID),
+    listActiveOrders(DEMO_RESTAURANT_ID),
+  ]);
   const summaries = await getBillSummariesDb(DEMO_RESTAURANT_ID, bills);
   const today = todayIst();
   const selectedDay = resolveDay(date);
@@ -142,7 +145,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
   // Only orders the owner has marked "Served" can be billed. Orders that
   // already have a bill are "billed", so they never appear here twice.
-  const billableOrders = (await listActiveOrders(DEMO_RESTAURANT_ID)).filter(
+  const billableOrders = activeOrders.filter(
     (o) =>
       o.status === "served" && (filterTable ? o.tableId === filterTable.id : true)
   );

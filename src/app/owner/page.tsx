@@ -20,10 +20,13 @@ import { TopSellingItems } from "@/components/dashboard/top-selling-items";
 
 export default async function OwnerDashboardPage() {
   const session = await requirePermission("overview");
-  const restaurantName = (await getSettings(session.restaurantId)).name;
-  const overview = await getTodayOverviewDb(session.restaurantId);
-  const hourlySeries = await getOrdersByHourWindowDb(session.restaurantId, 11);
-  const categories = await getOrdersByCategoryDb(session.restaurantId);
+  const [settings, overview, hourlySeries, categories] = await Promise.all([
+    getSettings(session.restaurantId),
+    getTodayOverviewDb(session.restaurantId),
+    getOrdersByHourWindowDb(session.restaurantId, 11),
+    getOrdersByCategoryDb(session.restaurantId),
+  ]);
+  const restaurantName = settings.name;
 
   // Derived, not invented: a straightforward calculation from two real
   // values already returned by getTodayOverview(). Guarded against

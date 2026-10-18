@@ -99,7 +99,7 @@ export function Footer() {
                         target="_blank"
                         rel="noopener noreferrer"
                         aria-label={social.label}
-                        className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--mkt-border)] text-[var(--mkt-text-secondary)] transition-all duration-300 hover:border-[var(--mkt-gold)] hover:text-[var(--mkt-gold)]"
+                        className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--mkt-border)] text-[var(--mkt-text-secondary)] transition-all duration-300 hover:border-[var(--mkt-lime)] hover:text-[var(--mkt-lime)]"
                       >
                         <svg
                           viewBox="0 0 24 24"
@@ -143,7 +143,7 @@ export function Footer() {
                   <dd className="mt-1">
                     <a
                       href={`tel:${phone.replace(/[^+\d]/g, "")}`}
-                      className={`text-[var(--mkt-text-primary)] ${link} hover:text-[var(--mkt-gold)]`}
+                      className={`text-[var(--mkt-text-primary)] ${link} hover:text-[var(--mkt-lime)]`}
                     >
                       {phone}
                     </a>
@@ -158,7 +158,7 @@ export function Footer() {
                   <dd className="mt-1 break-all">
                     <a
                       href={`mailto:${email}`}
-                      className={`text-[var(--mkt-text-primary)] ${link} hover:text-[var(--mkt-gold)]`}
+                      className={`text-[var(--mkt-text-primary)] ${link} hover:text-[var(--mkt-lime)]`}
                     >
                       {email}
                     </a>
@@ -175,7 +175,7 @@ export function Footer() {
                       href={siteHref}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`text-[var(--mkt-text-primary)] ${link} hover:text-[var(--mkt-gold)]`}
+                      className={`text-[var(--mkt-text-primary)] ${link} hover:text-[var(--mkt-lime)]`}
                     >
                       {website}
                     </a>

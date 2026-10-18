@@ -11,7 +11,7 @@ export function Contact() {
     >
       <div className="mkt-container grid items-center gap-12 md:grid-cols-[1fr_auto] md:gap-20">
         <Reveal>
-          <p className="text-xs uppercase tracking-[0.3em] text-[var(--mkt-gold)]">
+          <p className="text-xs uppercase tracking-[0.3em] text-[var(--mkt-lime)]">
             Contact Tablor
           </p>
 

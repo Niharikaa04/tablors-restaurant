@@ -57,7 +57,7 @@ export function Features() {
 
 
         <Reveal delay={0.1} className="mt-10 border-t border-[var(--mkt-border)] pt-8">
-          <h3 className="text-sm uppercase tracking-[0.2em] text-[var(--mkt-gold)]">Why choose Tablor&apos;s</h3>
+          <h3 className="text-sm uppercase tracking-[0.2em] text-[var(--mkt-lime)]">Why choose Tablor&apos;s</h3>
           <ul className="mt-4 grid gap-x-10 gap-y-2 text-sm text-[var(--mkt-text-secondary)] sm:grid-cols-2 lg:grid-cols-3">
             {benefits.map((b) => (
               <li key={b} className="flex items-center gap-2">

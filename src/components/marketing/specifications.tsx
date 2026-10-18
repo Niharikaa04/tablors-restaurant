@@ -46,7 +46,7 @@ export function Specifications() {
           />
         </Reveal>
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-[var(--mkt-gold)]">
+          <p className="text-xs uppercase tracking-[0.3em] text-[var(--mkt-lime)]">
             Product specifications
           </p>
           <h2
@@ -59,10 +59,10 @@ export function Specifications() {
             {highlights.map((h) => (
               <li
                 key={h.label}
-                className="rounded-xl border border-[var(--mkt-gold-soft)]/40 px-2 py-4 text-center sm:px-5 sm:py-5 sm:text-left"
+                className="rounded-xl border border-[var(--mkt-lime-dim)]/40 px-2 py-4 text-center sm:px-5 sm:py-5 sm:text-left"
               >
                 <p
-                  className="text-xl leading-none text-[var(--mkt-gold)] sm:text-3xl"
+                  className="text-xl leading-none text-[var(--mkt-lime)] sm:text-3xl"
                   style={{ fontFamily: "var(--mkt-serif)" }}
                 >
                   {h.value}
@@ -76,7 +76,7 @@ export function Specifications() {
           <StaggerGroup className="mt-8 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
             {specs.map((s) => (
               <StaggerItem key={s.label} className="border-l pl-4">
-                <div style={{ borderColor: "var(--mkt-gold-soft)" }}>
+                <div style={{ borderColor: "var(--mkt-lime-dim)" }}>
                   <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--mkt-text-muted)]">
                     {s.label}
                   </div>

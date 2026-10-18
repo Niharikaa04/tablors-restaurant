@@ -49,8 +49,10 @@ const globalForDb = globalThis as unknown as {
 const queryClient =
   globalForDb.__tablorsPg ??
   (globalForDb.__tablorsPg = postgres(url, {
-    // One connection per serverless instance; the pooler does the sharing.
-    max: process.env.VERCEL ? 1 : 5,
+    // A few connections per serverless instance so queries that run together
+    // (Promise.all on a page) really run in parallel instead of queueing on a
+    // single connection; the Supabase pooler still does the sharing.
+    max: process.env.VERCEL ? 3 : 5,
     prepare: false,
     idle_timeout: 20,
     max_lifetime: 60 * 30,

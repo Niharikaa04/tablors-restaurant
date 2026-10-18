@@ -496,17 +496,18 @@ export default async function TablesAndDevicesPage({
     activeFilter = "all";
   }
 
-  const activities = await getTableActivities(DEMO_RESTAURANT_ID);
-  const devices = await getDevicesDb(DEMO_RESTAURANT_ID);
+  const [activities, devices, todaysReservations] = await Promise.all([
+    getTableActivities(DEMO_RESTAURANT_ID),
+    getDevicesDb(DEMO_RESTAURANT_ID),
+    canReserve && session
+      ? listTodayReservationsDb(session.restaurantId)
+      : Promise.resolve([] as Awaited<ReturnType<typeof listTodayReservationsDb>>),
+  ]);
   const tables = activities.map((a) => a.table);
   const visibleActivities = activities.filter((a) =>
     matchesFilter(a, activeFilter),
   );
 
-  const todaysReservations =
-    canReserve && session
-      ? await listTodayReservationsDb(session.restaurantId)
-      : [];
   const reservationRows: ReservationRow[] =
     canReserve && session
       ? todaysReservations.map((r) => {

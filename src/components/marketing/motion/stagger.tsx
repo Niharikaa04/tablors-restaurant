@@ -16,7 +16,7 @@ export function StaggerGroup({
   children,
   className,
   stagger = 0.09,
-  repeat = true,
+  repeat = false,
   amount = 0.15,
 }: StaggerGroupProps) {
   const reduceMotion = useReducedMotion();
@@ -35,7 +35,7 @@ export function StaggerGroup({
       className={className}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: !repeat, amount, margin: "-10% 0px -10% 0px" }}
+      viewport={{ once: !repeat, amount, margin: "0px 0px -8% 0px" }}
       variants={container}
     >
       {children}

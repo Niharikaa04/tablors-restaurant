@@ -53,10 +53,13 @@ export default async function BillReceiptPage({ params }: PageProps) {
     notFound();
   }
 
-  const order = await getOrderFromDb(DEMO_RESTAURANT_ID, bill.orderId);
-  const table = await getTableByIdDb(DEMO_RESTAURANT_ID, bill.tableId);
+  const [order, table, summaryOrNull] = await Promise.all([
+    getOrderFromDb(DEMO_RESTAURANT_ID, bill.orderId),
+    getTableByIdDb(DEMO_RESTAURANT_ID, bill.tableId),
+    getBillPaymentSummaryDb(DEMO_RESTAURANT_ID, bill.id),
+  ]);
   const lines = order?.lines ?? [];
-  const summary = (await getBillPaymentSummaryDb(DEMO_RESTAURANT_ID, bill.id))!;
+  const summary = summaryOrNull!;
 
   return (
     <div>

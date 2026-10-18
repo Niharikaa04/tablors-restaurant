@@ -6,7 +6,7 @@ import { useReducedMotion } from "motion/react";
 const FRAMES = 36;
 const BASE = "/images/turntable/frame-"; // frame-00.png ... frame-35.png
 const EXT = "png";
-const FALLBACK = "/images/tablor-ordering-device-front.png";
+const FALLBACK = "/images/tablor-ordering-device-front.webp";
 const PX_PER_FRAME = 12; // drag distance per frame
 
 const src = (i: number) => `${BASE}${String(i).padStart(2, "0")}.${EXT}`;
