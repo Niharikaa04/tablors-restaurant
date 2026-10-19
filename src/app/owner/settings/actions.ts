@@ -1,15 +1,11 @@
-
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { hasPermission } from "@/server/modules/auth/permissions";
 import { getDemoSession } from "@/server/modules/auth/session";
-import { saveSettings } from "@/server/modules/demo-store/settings";
-
-export type SettingsActionResult =
-  | { ok: true }
-  | { ok: false; error: string };
+import { getSettings, saveSettings } from "@/server/modules/demo-store/settings";
 
 const time = z
   .string()
@@ -89,29 +85,81 @@ const schema = z.object({
     ),
 });
 
-export async function saveSettingsAction(
-  input: unknown,
-): Promise<SettingsActionResult> {
+const MAX_LOGO_BYTES = 200 * 1024;
+const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+function back(kind: "saved" | "error", message = "1"): never {
+  redirect(`/owner/settings?${kind}=${encodeURIComponent(message)}`);
+}
+
+export async function saveSettingsAction(formData: FormData): Promise<void> {
   const session = await getDemoSession();
 
   if (!session || !hasPermission(session.role, "settings")) {
-    return {
-      ok: false,
-      error: "Only the owner can change restaurant settings.",
-    };
+    back("error", "Only the owner can change restaurant settings.");
   }
 
-  const parsed = schema.safeParse(input);
+  const text = (key: string) => String(formData.get(key) ?? "");
+  const num = (key: string) => Number(formData.get(key) ?? 0);
+  const bool = (key: string) => formData.get(key) === "on";
+
+  // Logo: keep the current one unless a new file is chosen or "remove" is ticked.
+  const current = (await getSettings(session.restaurantId)) as {
+    logoDataUrl?: string | null;
+  };
+  let logoDataUrl: string | null = current.logoDataUrl ?? null;
+
+  if (bool("removeLogo")) {
+    logoDataUrl = null;
+  }
+
+  const file = formData.get("logo");
+  if (file instanceof File && file.size > 0) {
+    if (!LOGO_TYPES.includes(file.type)) {
+      back("error", "Logo must be PNG, JPG or WebP");
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      back("error", "Logo is too large (max 200 KB)");
+    }
+    const base64 = Buffer.from(await file.arrayBuffer()).toString("base64");
+    logoDataUrl = `data:${file.type};base64,${base64}`;
+  }
+
+  const parsed = schema.safeParse({
+    name: text("name"),
+    logoDataUrl,
+    address: text("address"),
+    gstNumber: text("gstNumber"),
+    phone: text("phone"),
+    email: text("email"),
+    openingTime: text("openingTime"),
+    closingTime: text("closingTime"),
+    gstRatePercent: num("gstRatePercent"),
+    serviceChargePercent: num("serviceChargePercent"),
+    pricesIncludeTax: bool("pricesIncludeTax"),
+    currency: text("currency"),
+    language: text("language"),
+    printer: {
+      enabled: bool("printerEnabled"),
+      paperWidthMm: num("printerPaperWidthMm"),
+      autoPrintOnPayment: bool("autoPrintOnPayment"),
+    },
+    kitchen: {
+      autoAcceptOrders: bool("autoAcceptOrders"),
+      defaultPrepMinutes: num("defaultPrepMinutes"),
+      soundAlerts: bool("soundAlerts"),
+    },
+    payment: {
+      cash: bool("paymentCash"),
+      qr: bool("paymentQr"),
+    },
+  });
 
   if (!parsed.success) {
-    return {
-      ok: false,
-      error: parsed.error.issues[0]?.message ?? "Invalid input",
-    };
+    back("error", parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
   await saveSettings(session.restaurantId, parsed.data);
   revalidatePath("/owner/settings");
-
-  return { ok: true };
+  back("saved");
 }
