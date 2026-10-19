@@ -60,14 +60,17 @@ export function SettingsForm({ initial }: { initial: RestaurantSettings }) {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-zinc-50">Restaurant Settings</h1>
-        <p className="mt-1 text-sm text-zinc-400">Business details, tax, printers and kitchen.</p>
+        <p className="mt-1 text-sm text-zinc-400">Business details, tax, printers, kitchen and payments.</p>
       </div>
 
       <Section title="Restaurant profile">
         <Field label="Restaurant name"><input className={input} value={s.name} onChange={(e) => set("name", e.target.value)} /></Field>
         <Field label="Logo (PNG/JPG/WebP, max 200 KB)">
           <div className="flex items-center gap-3">
-            {s.logoDataUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img src={s.logoDataUrl} alt="Logo" className="h-10 w-10 rounded object-cover" />}
+            {s.logoDataUrl && (
+  // eslint-disable-next-line @next/next/no-img-element
+  <img src={s.logoDataUrl} alt="Logo" className="h-10 w-10 rounded object-cover" />
+)}
             <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => onLogo(e.target.files?.[0])} className="text-xs text-zinc-400" />
             {s.logoDataUrl && <button type="button" onClick={() => set("logoDataUrl", null)} className="text-xs text-zinc-500 hover:text-red-400">Remove</button>}
           </div>
@@ -110,8 +113,14 @@ export function SettingsForm({ initial }: { initial: RestaurantSettings }) {
       </Section>
 
       <Section title="Kitchen settings">
+        <Toggle label="Auto-accept new orders" checked={s.kitchen.autoAcceptOrders} onChange={(v) => set("kitchen", { ...s.kitchen, autoAcceptOrders: v })} />
         <Toggle label="Sound alerts for new orders" checked={s.kitchen.soundAlerts} onChange={(v) => set("kitchen", { ...s.kitchen, soundAlerts: v })} />
         <Field label="Default prep time (minutes)"><input type="number" min={1} max={180} className={input} value={s.kitchen.defaultPrepMinutes} onChange={(e) => set("kitchen", { ...s.kitchen, defaultPrepMinutes: Number(e.target.value) })} /></Field>
+      </Section>
+
+      <Section title="Payment settings">
+        <Toggle label="Accept cash" checked={s.payment.cash} onChange={(v) => set("payment", { ...s.payment, cash: v })} />
+        <Toggle label="Accept QR / UPI" checked={s.payment.qr} onChange={(v) => set("payment", { ...s.payment, qr: v })} />
       </Section>
 
       {msg && (
