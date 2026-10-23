@@ -1,10 +1,14 @@
 import "server-only";
 
-import { listAllOrders, listActiveOrders } from "@/server/modules/orders/db-orders";
-import { listBillsDb } from "@/server/modules/billing/db-billing";
-import { getTablesDb } from "@/server/modules/data/tables-db";
-import { getDevicesDb } from "@/server/modules/data/devices-db";
-import { getMenuIncludingArchivedDb } from "@/server/modules/data/menu-db";
+import {
+  getDevicesCached as getDevicesDb,
+  getMenuIncludingArchivedCached as getMenuIncludingArchivedDb,
+  getTablesCached as getTablesDb,
+  listActiveOrdersCached as listActiveOrders,
+  listAllOrdersCached as listAllOrders,
+  listBillsCached as listBillsDb,
+} from "@/server/modules/data/request-reads";
+import { cache } from "react";
 import {
   RESTAURANT_TIME_ZONE,
   type CategoryOrders,
@@ -47,7 +51,7 @@ function menuLookup(menu: MenuItem[]) {
     (line.itemId ? byId.get(line.itemId) : byCode.get(line.code)) ?? null;
 }
 
-export async function getTodayOverviewDb(restaurantId: string, now = Date.now()) {
+async function computeTodayOverview(restaurantId: string, now: number) {
   const [allOrders, bills, tables, devices] = await Promise.all([
     listAllOrders(restaurantId),
     listBillsDb(restaurantId),
@@ -71,6 +75,20 @@ export async function getTodayOverviewDb(restaurantId: string, now = Date.now())
     devicesOnline: devices.filter((d) => d.online).length,
     devicesTotal: devices.length,
   };
+}
+
+const todayOverviewForRender = cache((restaurantId: string) =>
+  computeTodayOverview(restaurantId, Date.now()),
+);
+
+/**
+ * Without `now` this is shared by every panel of one page render (one set of
+ * queries instead of one per panel). Passing `now` computes it fresh.
+ */
+export function getTodayOverviewDb(restaurantId: string, now?: number) {
+  return now === undefined
+    ? todayOverviewForRender(restaurantId)
+    : computeTodayOverview(restaurantId, now);
 }
 
 export async function getTopSellingItemsDb(

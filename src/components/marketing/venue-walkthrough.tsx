@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { motion, useReducedMotion } from "motion/react";
 
-const FRONT_SRC = "/images/tablor-ordering-device-front.webp";
-const BACK_SRC = "/images/tablor-ordering-device-back.webp";
+const FRONT_SRC = "/images/device-views/front.webp";
+const BACK_SRC = "/images/device-views/back.webp";
 /** width / height of the front image. Set from the real file. */
-const ASPECT = 2;
+const ASPECT = 1600 / 637;
 
 type Focus = { x: number; y: number; scale: number };
 type Step = {
@@ -20,7 +20,7 @@ type Step = {
 
 /*
  * Only things visible on the supplied photos (keypad, QTY keys, button
- * labels, LCD columns, handset, cable, TABLE 05 label) or already stated in
+ * labels, LCD columns, TABLE 05 label) or already stated in
  * the site copy (order goes to the kitchen; owner sees tables, orders, bills).
  */
 const STEPS: Step[] = [
@@ -33,31 +33,25 @@ const STEPS: Step[] = [
     title: "Choose with the keypad",
     text: "Type an item code on the numeric keypad and set the quantity with the QTY keys.",
     image: "front",
-    focus: { x: 24, y: 58, scale: 1.9 },
+    focus: { x: 16, y: 55, scale: 3 },
   },
   {
     title: "See the order on the screen",
     text: "The built-in display lists each item with its code, quantity and price, plus the total.",
     image: "front",
-    focus: { x: 70, y: 52, scale: 2 },
+    focus: { x: 77, y: 53, scale: 2.4 },
   },
   {
     title: "Confirm to send",
     text: "Press Confirm Order and the order goes straight to the kitchen.",
     image: "front",
-    focus: { x: 42, y: 46, scale: 2 },
+    focus: { x: 35, y: 33, scale: 3 },
   },
   {
     title: "Ask for help or the bill",
     text: "Dedicated buttons let guests call a waiter, generate the bill, clear the order or leave feedback.",
     image: "front",
-    focus: { x: 47, y: 56, scale: 1.8 },
-  },
-  {
-    title: "Handset and cable",
-    text: "A black handset with a coiled cable is built into the terminal.",
-    image: "front",
-    focus: { x: 50, y: 18, scale: 1.8 },
+    focus: { x: 38, y: 57, scale: 2.2 },
   },
   {
     title: "Every table has a number",
@@ -75,7 +69,7 @@ export function VenueWalkthrough({
   venue,
   onClose,
 }: {
-  venue: { name: string; blurb: string } | null;
+  venue: { name: string; blurb: string; popupImage?: string } | null;
   onClose: () => void;
 }) {
   const reduce = useReducedMotion();

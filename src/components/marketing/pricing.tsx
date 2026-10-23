@@ -76,7 +76,7 @@ export function Pricing() {
   return (
     <section
       id="pricing"
-      className="w-full px-6 py-20 sm:py-28 lg:px-8"
+      className="w-full px-6 py-12 sm:py-16 lg:px-8"
       aria-labelledby="pricing-heading"
     >
       <div className="mkt-container">

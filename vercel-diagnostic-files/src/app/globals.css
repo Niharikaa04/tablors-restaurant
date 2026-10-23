@@ -1,0 +1,446 @@
+@import "tailwindcss";
+
+/* ==========================================================
+   TABLOR'S DESIGN TOKENS
+   Brand: pitch-black surfaces, gold accents, radium-green
+   status/KPI accents. WCAG AA contrast target.
+   ========================================================== */
+
+:root {
+  /* Surfaces */
+  --color-surface-0: #05070a;   /* pitch black base */
+  --color-surface-1: #0d1015;   /* raised panel */
+  --color-surface-2: #161a21;   /* card / input */
+  --color-border: #262b33;
+
+  /* Text */
+  --color-text-primary: #f5f6f7;
+  --color-text-secondary: #a4acb8;
+  --color-text-muted: #6b7280;
+
+  /* Brand: gold */
+  --color-gold-500: #d4af37;
+  --color-gold-400: #e4c766;
+  --color-gold-600: #a9862a;
+
+  /* Accent: radium green (status / KPI / selected) */
+  --color-radium-500: #39ff6a;
+  --color-radium-600: #22c95a;
+  --color-radium-700: #189446;
+
+  /* Semantic status */
+  --color-success: #39ff6a;
+  --color-warning: #f5c451;
+  --color-danger: #ff5c5c;
+  --color-info: #4fb4ff;
+
+  --radius-brand: 0.75rem;
+
+  --background: var(--color-surface-0);
+  --foreground: var(--color-text-primary);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-surface-0: var(--color-surface-0);
+  --color-surface-1: var(--color-surface-1);
+  --color-surface-2: var(--color-surface-2);
+  --color-border: var(--color-border);
+
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+
+  --color-gold-400: var(--color-gold-400);
+  --color-gold-500: var(--color-gold-500);
+  --color-gold-600: var(--color-gold-600);
+
+  --color-radium-500: var(--color-radium-500);
+  --color-radium-600: var(--color-radium-600);
+  --color-radium-700: var(--color-radium-700);
+
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-info: var(--color-info);
+
+  --radius-brand: var(--radius-brand);
+}
+
+/* Tablor's is dark-by-default (brand identity), not OS-theme-driven */
+body {
+  background: var(--color-surface-0);
+  color: var(--color-text-primary);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  overflow-x: hidden;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+/* Respect reduced motion globally per Section 5 of the spec */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  html.marketing-scroll {
+    scroll-snap-type: none !important;
+  }
+}
+
+/* Focus visibility (accessibility requirement) */
+:focus-visible {
+  outline: 2px solid var(--color-radium-500);
+  outline-offset: 2px;
+}
+
+/* ==========================================================
+   TABLOR'S CUSTOMER DESIGN TOKENS
+   New brand direction: olive-black / acid-lime. Scoped as
+   additive variables — the existing gold/radium tokens above
+   are still used by marketing/owner/kitchen and are left
+   untouched. These are consumed under `.tablor-customer`
+   (see src/app/customer/layout.tsx) so the migration is
+   intentional and route-scoped, not a global side effect.
+   ========================================================== */
+
+.tablor-customer {
+  --tablor-bg: #0d0e0b;
+  --tablor-card: #15170f;
+  --tablor-icon-surface: #1a1c15;
+  --tablor-border: #23251f;
+
+  --tablor-accent: #d7fe3b;
+  --tablor-accent-hover: #c4ec2a;
+
+  --tablor-text-primary: #f2f3ec;
+  --tablor-text-secondary: #9da194;
+  --tablor-text-muted: #7e8276;
+  --tablor-text-low: #5c5f54;
+
+  --tablor-error: #e27468;
+
+  background: var(--tablor-bg);
+  color: var(--tablor-text-primary);
+  min-height: 100%;
+}
+
+/* ==========================================================
+   TABLOR'S PHYSICAL DEVICE REPRODUCTION
+   Scoped to `.tablor-device` only (the /customer/[tableId]
+   ordering screen). Matches the PDF reference: dark book shell
+   with gold accents, cream paper menu pages, dark LCD order
+   panel. Does not touch `.tablor-customer` (lime) tokens above,
+   which remain in use on /order and /customer/menu.
+   ========================================================== */
+
+.tablor-device {
+  --device-shell: #12131a;
+  --device-shell-border: #2a2416;
+  --device-gold: #d4af37;
+  --device-gold-soft: #caa646;
+  --device-gold-hover: #e6c250;
+
+  --device-paper: #f4ecd8;
+  --device-paper-border: #ddd0ac;
+  --device-paper-text: #241f14;
+  --device-paper-muted: #6b6250;
+
+  --device-lcd-bg: #0b0d10;
+  --device-lcd-border: #23252b;
+  --device-lcd-cyan: #4fd6e8;
+  --device-lcd-text: #eef1f5;
+  --device-lcd-muted: #7c8590;
+
+  --device-badge: #171a10;
+  --device-tag-red: #c23b34;
+}
+
+/* ==========================================================
+   OWNER OVERVIEW — OPERATIONS COMMAND CENTER
+   Scoped to `.tablor-owner-overview` (the /owner Overview page
+   only). Same olive-black / acid-lime family as `.tablor-customer`
+   and `.tablor-marketing`, so the Overview reads as one product
+   with the customer device and marketing site. The rest of the
+   owner portal (sidebar, Menu, Tables, Orders, Billing, Devices,
+   Reports) is untouched and keeps its existing pitch-black/gold/
+   radium-green look.
+   ========================================================== */
+
+.tablor-owner-overview {
+  --ov-bg: #0d0e0b;
+  --ov-surface: #15170f;
+  --ov-icon-surface: #1a1c15;
+  --ov-border: #23251f;
+
+  --ov-accent: #d7fe3b;
+  --ov-accent-hover: #c4ec2a;
+
+  --ov-text: #f2f3ec;
+  --ov-text-secondary: #9da194;
+  --ov-muted: #7e8276;
+
+  --ov-gold: #d4af37;
+  --ov-gold-soft: #e4c766;
+
+  color: var(--ov-text);
+}
+
+/* ==========================================================
+   KITCHEN DISPLAY SYSTEM
+   Scoped to `.tablor-kitchen` (the /kitchen route only). Same
+   olive-black / acid-lime brand family as `.tablor-customer`,
+   `.tablor-owner-overview` and `.tablor-marketing` — this is a
+   staff operating screen, not a marketing surface, so it gets its
+   own scope rather than reusing the customer one. A few extra
+   semantic tokens on top of the shared family cover the kitchen's
+   own order-workflow states (incoming/preparing/ready/served),
+   which don't exist anywhere else in the product.
+   ========================================================== */
+
+.tablor-kitchen {
+  --kd-bg: #0d0e0b;
+  --kd-surface: #15170f;
+  --kd-surface-raised: #1a1c15;
+  --kd-border: #23251f;
+
+  --kd-accent: #d7fe3b;
+  --kd-accent-hover: #c4ec2a;
+  --kd-accent-ink: #10140a; /* text color to sit on top of the lime accent */
+
+  --kd-text: #f2f3ec;
+  --kd-text-secondary: #9da194;
+  --kd-muted: #6c7064;
+
+  --kd-error: #e27468;
+
+  /* Order-workflow states, kept distinct from each other at a glance */
+  --kd-incoming: #e2857a;
+  --kd-preparing: #f0a83c;
+  --kd-ready: #6fcf6f;
+  --kd-served: #7c8bb0;
+
+  background: var(--kd-bg);
+  color: var(--kd-text);
+  min-height: 100%;
+}
+
+/* ==========================================================
+   CINEMATIC LANDING PAGE SCROLL
+   Scoped to the marketing route only (toggled on <html> by
+   MarketingScrollScope while that layout is mounted). Dashboards,
+   forms, and auth routes never receive this class, so their
+   scrolling stays completely normal.
+   ========================================================== */
+
+/* Proximity (not mandatory) snap: sections settle into place when the
+   user is near a boundary, but nothing traps the scroll or clips
+   content taller than the viewport (pricing/feature grids, the demo
+   form). Enabled from tablet width up; phones keep plain smooth
+   scrolling since snap can fight on-screen keyboards / short viewports. */
+@media (min-width: 768px) {
+  html.marketing-scroll {
+    scroll-snap-type: y proximity;
+  }
+}
+
+.snap-section {
+  scroll-snap-align: start;
+  scroll-snap-stop: normal;
+}
+
+/* Offset anchored/snapped sections so the sticky navbar never covers
+   the top of the section content. */
+section[id] {
+  scroll-margin-top: 4.25rem;
+}
+
+/* ==========================================================
+   PREMIUM MOTION UTILITIES
+   ========================================================== */
+
+@keyframes tablors-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes tablors-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    filter: drop-shadow(0 0 12px rgba(57, 255, 106, 0.35));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 22px rgba(57, 255, 106, 0.6));
+  }
+}
+
+.animate-float {
+  animation: tablors-float 6s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: tablors-glow-pulse 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-glow-pulse {
+    animation: none;
+  }
+}
+
+/* Custom scrollbar for horizontally-scrollable strips (kept subtle,
+   never introduces layout-shifting horizontal page overflow). */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+/* Custom scrollbars for dashboard usability */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-0);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-radium-500);
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ==========================================================
+   MARKETING HOMEPAGE — 2026 ART DIRECTION
+   Scoped to `.tablor-marketing` (the public marketing layout
+   only). Same family as `.tablor-customer` / `.tablor-device`:
+   olive-black surfaces, one restrained acid-lime accent for
+   action/emphasis, and the existing device-gold reserved for
+   the wordmark and the physical device itself. Owner, kitchen,
+   admin and auth routes are untouched.
+   ========================================================== */
+
+.tablor-marketing {
+  --mkt-bg: #0d0e0b;
+  --mkt-bg-raised: #111309;
+  --mkt-stage: #0a0b08;
+  --mkt-surface: #15170f;
+  --mkt-surface-2: #1a1c15;
+  --mkt-border: #23251f;
+  --mkt-border-strong: #33361f;
+
+  --mkt-text-primary: #f2f3ec;
+  --mkt-text-secondary: #9da194;
+  --mkt-text-muted: #6c7064;
+
+  --mkt-lime: #d7fe3b;
+  --mkt-lime-dim: #a7c72e;
+  --mkt-lime-ink: #10140a; /* text color to sit on top of lime */
+
+  --mkt-gold: #d4af37;
+  --mkt-gold-soft: #b8933a;
+
+  --mkt-danger: #e2857a;
+
+  --mkt-serif:
+    ui-serif, Georgia, "Times New Roman", serif;
+  --mkt-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+
+  background: var(--mkt-bg);
+  color: var(--mkt-text-primary);
+}
+
+/* Fine print grain — a single low-opacity fractal-noise layer, fixed to
+   the viewport behind marketing content only. This is the one texture
+   effect on the page: no gradients, glow blobs or glass panels. */
+.tablor-marketing .mkt-grain {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tablor-marketing .mkt-grain {
+    display: none;
+  }
+}
+
+.mkt-container {
+  margin-inline: auto;
+  max-width: 78rem;
+  padding-inline: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .mkt-container {
+    padding-inline: 2.5rem;
+  }
+}
+
+/* Editorial hairline rule, full-bleed within a section */
+.mkt-rule {
+  border-top: 1px solid var(--mkt-border);
+}
+
+/* Underline-reveal link button (replaces glow-blob CTAs) */
+.mkt-link-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mkt-link-cta::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -0.2em;
+  height: 1px;
+  width: 100%;
+  background: currentColor;
+  transform: scaleX(0.22);
+  transform-origin: left;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0.55;
+}
+
+.mkt-link-cta:hover::after,
+.mkt-link-cta:focus-visible::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+/* Numbered editorial rows (product intro / features index) */
+.mkt-index-row + .mkt-index-row {
+  border-top: 1px solid var(--mkt-border);
+}

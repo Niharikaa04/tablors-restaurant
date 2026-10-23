@@ -33,8 +33,8 @@ export { SAMPLE_GST_PERCENT, sampleLines, sampleItems, sampleSubtotal, sampleGst
  * half in, so with `prefers-reduced-motion` the sequence is simply readable
  * top-to-bottom.
  *
- * Only the terminal's keypad, order buttons, built-in LCD order display and
- * handset are established by the client's reference. The order-display
+ * Only the terminal's keypad, order buttons and built-in LCD order display
+ * are established by the client's reference. The order-display
  * panels below are illustrations of that LCD; they do not claim extra
  * device functions (no QR, menu pages or bill printing on the device).
  */
@@ -102,7 +102,7 @@ export function ProductStory() {
     <section
       id="story"
       aria-label="How an order moves from the table, through the terminal, the kitchen and the owner's dashboard, to the final bill"
-      className="snap-section relative bg-[var(--mkt-stage)] px-6 py-16 sm:py-20 lg:py-24"
+      className="snap-section relative bg-[var(--mkt-stage)] px-6 py-10 sm:py-12 lg:py-16"
     >
       <div id="product" aria-hidden="true" className="absolute top-0" style={{ scrollMarginTop: "4.25rem" }} />
 
@@ -164,7 +164,7 @@ function StoryStep({ step, first }: { step: Step; first: boolean }) {
   return (
     <div
       id={step.anchorId}
-      className={`grid items-center gap-8 py-10 sm:py-12 lg:grid-cols-2 lg:gap-16 lg:py-16 ${
+      className={`grid items-center gap-8 py-6 sm:py-8 lg:grid-cols-2 lg:gap-16 lg:py-10 ${
         first ? "" : "border-t border-[var(--mkt-border)]"
       }`}
       style={step.anchorId ? { scrollMarginTop: "4.25rem" } : undefined}

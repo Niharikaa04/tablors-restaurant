@@ -10,8 +10,7 @@ import {
   type Variants,
 } from "motion/react";
 import { CtaButton } from "./motion/cta-button";
-import { DevicePhotoFlip } from "./device-photo-flip";
-import { DEVICE_ASPECT } from "./tablor-device-image";
+import { DeviceViewer3D } from "./table05/device-viewer-3d";
 
 /*
  * HERO PRODUCT SCALE
@@ -21,6 +20,8 @@ import { DEVICE_ASPECT } from "./tablor-device-image";
  * aspect ratio), capped by the width of its column.
  */
 const DEVICE_HEIGHT = 0.56;
+/** width / height of the 3D stage (kept at the hero's existing proportions). */
+const STAGE_ASPECT = 2.2;
 
 export function Hero() {
   const reduceMotion = useReducedMotion();
@@ -80,7 +81,7 @@ export function Hero() {
   };
 
   const deviceWidth = {
-    "--device-w": `min(100%, calc(var(--hero-h) * ${DEVICE_HEIGHT} * ${DEVICE_ASPECT}))`,
+    "--device-w": `min(100%, calc(var(--hero-h) * ${DEVICE_HEIGHT} * ${STAGE_ASPECT}))`,
   } as CSSProperties;
 
   return (
@@ -264,7 +265,7 @@ export function Hero() {
               }}
             />
 
-            <DevicePhotoFlip className="relative z-10 w-full" />
+            <DeviceViewer3D className="relative z-10 w-full" aspect={STAGE_ASPECT} />
           </motion.div>
         </div>
       </div>

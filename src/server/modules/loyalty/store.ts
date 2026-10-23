@@ -50,7 +50,7 @@ export function normalizePhone(input: string): string | null {
 }
 
 export function maskPhone(phone: string): string {
-  return `${phone.slice(0, 2)}••••${phone.slice(-4)}`;
+  return phone.length > 4 ? `${phone.slice(0, 2)}${"*".repeat(phone.length - 4)}${phone.slice(-2)}` : "****";
 }
 
 export function todayISO(): string {

@@ -10,8 +10,10 @@ import { SectionHeader } from "./section-header";
 export async function KitchenStatusPanel() {
   runNotificationSweep();
 
-  const overview = await getTodayOverviewDb(DEMO_RESTAURANT_ID);
-  const slowOrders = await getSlowActiveOrdersDb(DEMO_RESTAURANT_ID);
+  const [overview, slowOrders] = await Promise.all([
+    getTodayOverviewDb(DEMO_RESTAURANT_ID),
+    getSlowActiveOrdersDb(DEMO_RESTAURANT_ID),
+  ]);
 
   const rows = [
     { label: "New", value: overview.newOrders, icon: Clock },

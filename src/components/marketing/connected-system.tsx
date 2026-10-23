@@ -118,7 +118,7 @@ export function ConnectedSystem() {
   const [activeCard, setActiveCard] = useState<number | null>(null);
 
   return (
-    <section id="system" className="snap-section relative overflow-hidden bg-[var(--mkt-stage)] px-6 py-16 sm:py-20 lg:py-24">
+    <section id="system" className="snap-section relative overflow-hidden bg-[var(--mkt-stage)] px-6 py-10 sm:py-12 lg:py-16">
       <div className="mkt-container">
         <Reveal className="max-w-2xl">
           <p className="text-xs uppercase tracking-[0.3em] text-[var(--mkt-lime)]">One connected system</p>

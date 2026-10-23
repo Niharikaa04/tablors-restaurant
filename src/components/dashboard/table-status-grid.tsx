@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { DEMO_RESTAURANT_ID } from "@/server/modules/auth/session";
-import { getTablesDb } from "@/server/modules/data/tables-db";
-import { listActiveOrders } from "@/server/modules/orders/db-orders";
+import { getTablesCached, listActiveOrdersCached } from "@/server/modules/data/request-reads";
 import type { TableStatus } from "@/server/modules/demo-store/store";
 import { SectionHeader } from "./section-header";
 
@@ -12,8 +11,10 @@ const STATUS_STYLES: Record<TableStatus, string> = {
 };
 
 export async function TableStatusGrid() {
-  const tables = await getTablesDb(DEMO_RESTAURANT_ID);
-  const orders = await listActiveOrders(DEMO_RESTAURANT_ID);
+  const [tables, orders] = await Promise.all([
+    getTablesCached(DEMO_RESTAURANT_ID),
+    listActiveOrdersCached(DEMO_RESTAURANT_ID),
+  ]);
   const occupied = tables.filter((t) => t.status === "occupied").length;
 
   return (

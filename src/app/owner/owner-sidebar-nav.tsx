@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
-  Bell,
   ClipboardList,
   CreditCard,
   Gift,
@@ -61,11 +60,6 @@ const navItems: NavItem[] = [
     href: "/owner/loyalty",
     label: "Loyalty",
     icon: Gift,
-  },
-  {
-    href: "/owner/notifications",
-    label: "Notifications",
-    icon: Bell,
   },
   {
     href: "/owner/offers",

@@ -2,14 +2,14 @@ import Image from "next/image";
 
 /*
  * Single source of truth for the Tablor's countertop ordering terminal photo.
- * width/height are the real pixel size of public/images/tablor-ordering-device.webp
- * (the cropped file). If you swap in a higher-resolution original, update them.
+ * width/height are the real pixel size of public/images/device-views/front.webp
+ * (the supplied front view). If you swap in a different original, update them.
  */
 export const DEVICE_IMAGE = {
-  src: "/images/tablor-ordering-device.webp",
-  width: 787,
-  height: 399,
-  alt: "Tablor's countertop ordering terminal with a numeric keypad, dedicated order buttons, a built-in LCD order display and a telephone-style handset",
+  src: "/images/device-views/front.webp",
+  width: 1600,
+  height: 637,
+  alt: "Tablor TABLE 05 countertop ordering terminal, front view: silver panel with a numeric keypad, order buttons and a built-in LCD order display",
 } as const;
 
 export const DEVICE_ASPECT = DEVICE_IMAGE.width / DEVICE_IMAGE.height;

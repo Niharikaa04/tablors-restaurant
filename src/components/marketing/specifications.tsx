@@ -11,13 +11,12 @@ import { TablorDeviceImage } from "./tablor-device-image";
  * Menu -> Select -> Confirm -> Bill flow.
  *
  * ADD ONLY WHEN CONFIRMED BY THE CLIENT: dimensions, LCD size/resolution,
- * power (mains/battery), connectivity, materials/finish, weight, handset
- * function, button functions.
+ * power (mains/battery), connectivity, materials/finish, weight,
+ * button functions.
  */
 const highlights = [
   { value: "Keypad", label: "Numeric" },
   { value: "LCD", label: "Built-in order display" },
-  { value: "Handset", label: "Telephone-style" },
 ];
 
 const specs = [
@@ -26,7 +25,6 @@ const specs = [
   { label: "Input", value: "Numeric keypad" },
   { label: "Order buttons", value: "Dedicated order buttons" },
   { label: "Display", value: "Built-in LCD order display" },
-  { label: "Handset", value: "Telephone-style handset" },
   { label: "Power input", value: "DC 12V, 3A" },
   { label: "Made in", value: "India" },
 ];
@@ -35,7 +33,7 @@ export function Specifications() {
   return (
     <section
       id="specifications"
-      className="border-t border-[var(--mkt-border)] px-6 py-16 sm:py-20 lg:py-24"
+      className="border-t border-[var(--mkt-border)] px-6 py-10 sm:py-12 lg:py-16"
       style={{ scrollMarginTop: "4.25rem" }}
     >
       <div className="mkt-container grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_1fr] lg:items-center lg:gap-16">
@@ -55,7 +53,7 @@ export function Specifications() {
           >
             The terminal, at a glance
           </h2>
-          <ul className="mt-8 grid grid-cols-3 gap-3 sm:gap-5">
+          <ul className="mt-8 grid grid-cols-2 gap-3 sm:gap-5">
             {highlights.map((h) => (
               <li
                 key={h.label}

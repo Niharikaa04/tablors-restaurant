@@ -12,6 +12,7 @@ import {
   listRewardsDb,
 } from "@/server/modules/loyalty-db/db-loyalty";
 import { maskPhone } from "@/server/modules/loyalty-db/engine";
+import { MemberMessenger } from "./member-messenger";
 import {
   adjustPointsAction,
   createRewardAction,
@@ -224,29 +225,20 @@ export default async function LoyaltyPage({
         {customers.length === 0 ? (
           <p className="mt-3 text-sm text-zinc-500">No members yet. They appear when a customer enters a mobile number on their bill.</p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-widest text-zinc-500">
-                <tr><th className="py-2">Mobile</th><th>Points</th><th>Status</th><th /></tr>
-              </thead>
-              <tbody>
-                {customers.map((c) => (
-                  <tr key={c.id} className="border-t border-zinc-800 text-zinc-200">
-                    <td className="py-2">{isOwner ? c.phone : maskPhone(c.phone)}</td>
-                    <td>{c.balance}</td>
-                    <td>{c.status}</td>
-                    <td className="text-right"><Link className="underline" href={`/owner/loyalty?customer=${c.id}`}>View</Link></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <MemberMessenger
+            members={customers.map((c) => ({
+              id: c.id,
+              maskedPhone: maskPhone(c.phone),
+              balance: c.balance,
+              status: c.status,
+            }))}
+          />
         )}
 
         {selected && (
           <div className="mt-6 space-y-4 border-t border-zinc-800 pt-5">
             <h3 className="text-base font-semibold text-white">
-              {isOwner ? selected.phone : maskPhone(selected.phone)} · {selected.balance} points
+              {maskPhone(selected.phone)} · {selected.balance} points
             </h3>
 
             {isOwner && (

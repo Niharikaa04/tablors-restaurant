@@ -4,7 +4,7 @@ import { TablorDeviceImage } from "./tablor-device-image";
 /*
  * Only what the client's reference image establishes: a countertop terminal
  * with a numeric keypad, dedicated order buttons, a built-in LCD order
- * display and a telephone-style handset. Do not add functions here until the
+ * display. Do not add functions here until the
  * client confirms them.
  */
 const parts = [
@@ -20,10 +20,6 @@ const parts = [
     title: "Order display",
     text: "A built-in LCD shows the current order.",
   },
-  {
-    title: "Handset",
-    text: "A telephone-style handset is part of the terminal.",
-  },
 ] as const;
 
 const steps = [
@@ -36,7 +32,7 @@ export function OpenDevice() {
   return (
     <section
       id="device"
-      className="px-6 py-16 sm:py-20 lg:py-24"
+      className="px-6 py-10 sm:py-12 lg:py-16"
       style={{ scrollMarginTop: "4.25rem" }}
     >
       <div className="mkt-container">

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { requirePermission } from "@/server/modules/auth/session";
 import { getSettings } from "@/server/modules/demo-store/settings";
 import {
@@ -17,6 +18,15 @@ import { TableStatusGrid } from "@/components/dashboard/table-status-grid";
 import { KitchenStatusPanel } from "@/components/dashboard/kitchen-status-panel";
 import { DeviceHealthPanel } from "@/components/dashboard/device-health-panel";
 import { TopSellingItems } from "@/components/dashboard/top-selling-items";
+
+function PanelSkeleton({ className = "h-64" }: { className?: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`animate-pulse rounded-xl border border-[var(--ov-border)] bg-[var(--ov-surface)] ${className}`}
+    />
+  );
+}
 
 export default async function OwnerDashboardPage() {
   const session = await requirePermission("overview");
@@ -52,7 +62,9 @@ export default async function OwnerDashboardPage() {
         hourlySeries={hourlySeries}
       />
 
-      <AttentionPanel />
+      <Suspense fallback={<PanelSkeleton />}>
+<AttentionPanel />
+</Suspense>
 
       {/* Sales trend, category mix, and the floor — the at-a-glance operational picture */}
       <div className="grid gap-5 lg:grid-cols-12">
@@ -65,26 +77,38 @@ export default async function OwnerDashboardPage() {
         </div>
 
         <div className="lg:col-span-4">
-          <TableStatusGrid />
+          <Suspense fallback={<PanelSkeleton />}>
+<TableStatusGrid />
+</Suspense>
         </div>
       </div>
 
       {/* What's moving right now, and what's selling */}
       <div className="grid gap-5 lg:grid-cols-12">
         <div className="lg:col-span-7">
-          <RecentOrdersTable />
+          <Suspense fallback={<PanelSkeleton />}>
+<RecentOrdersTable />
+</Suspense>
         </div>
 
         <div className="lg:col-span-5">
-          <TopSellingItems />
+          <Suspense fallback={<PanelSkeleton />}>
+<TopSellingItems />
+</Suspense>
         </div>
       </div>
 
       {/* Deeper operational detail: live tickets, kitchen load, device fleet */}
       <div className="grid gap-5 lg:grid-cols-3">
-        <LiveOrdersPanel />
-        <KitchenStatusPanel />
-        <DeviceHealthPanel />
+        <Suspense fallback={<PanelSkeleton />}>
+<LiveOrdersPanel />
+</Suspense>
+        <Suspense fallback={<PanelSkeleton />}>
+<KitchenStatusPanel />
+</Suspense>
+        <Suspense fallback={<PanelSkeleton />}>
+<DeviceHealthPanel />
+</Suspense>
       </div>
     </div>
   );

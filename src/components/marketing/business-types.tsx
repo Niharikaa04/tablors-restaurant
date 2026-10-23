@@ -12,13 +12,36 @@ import { VenueWalkthrough } from "./venue-walkthrough";
  * After converting the photos to JPG, change ".png" to ".jpg" below.
  */
 const venues = [
-  { name: "Restaurants", blurb: "Streamlined ordering for a better dining experience.", image: "/images/restaurant.webp", position: "center" },
-  { name: "Trains", blurb: "Convenient onboard ordering for a smoother journey.", image: "/images/train.webp", position: "center" },
-  { name: "Hotel Room Service", blurb: "Let guests request food and service directly from their room.", image: "/images/hotel.webp", position: "center" },
-  { name: "Theatres", blurb: "Make food and refreshment ordering easy during every show.", image: "/images/theatre.webp", position: "center" },
-  { name: "Hospitals", blurb: "Simplify meal ordering and service for patients and visitors.", image: "/images/hospital.webp", position: "center" },
-  { name: "Airport Lounges", blurb: "Offer convenient dining and refreshments while guests wait for their flight.", image: "/images/airport.webp", position: "center" },
-  { name: "SPA Salon", blurb: "Let guests book services and order refreshments without leaving their seat.", image: "/images/saloon.webp", position: "center" },
+  {
+    name: "Restaurants",
+    blurb: "Streamlined ordering for a better dining experience.",
+    image: "/images/restaurant.webp",
+    // Picture shown at the top of the pop-up after clicking this card.
+    popupImage: "/images/restaurant.webp",
+    position: "center",
+  },
+  {
+    name: "Trains",
+    blurb: "Convenient onboard ordering for a smoother journey.",
+    image: "/images/train.webp",
+    popupImage: "/images/train.webp",
+    position: "center",
+  },
+  {
+    name: "Hotel Room Service",
+    blurb: "Let guests request food and service directly from their room.",
+    image: "/images/hotel.webp",
+    // Each venue shows its own pop-up picture.
+    popupImage: "/images/hotel.webp",
+    position: "center",
+  },
+  {
+    name: "Hospitals",
+    blurb: "Simplify meal ordering and service for patients and visitors.",
+    image: "/images/hospital.webp",
+    popupImage: "/images/hospital.webp",
+    position: "center",
+  },
 ] as const;
 
 type VenueName = (typeof venues)[number]["name"];
@@ -39,7 +62,7 @@ const SHADOW_ACTIVE =
  * Clicking, tapping or pressing Enter on a card opens the device
  * walkthrough for that venue (see venue-walkthrough.tsx).
  *
- * Seven cards: the last one is centred on its own row (2-col and 3-col grids).
+ * Four cards: restaurants, trains, hotel room service and hospitals.
  */
 export function BusinessTypes() {
   const [hovered, setHovered] = useState<VenueName | null>(null);
@@ -60,8 +83,8 @@ export function BusinessTypes() {
   return (
     <>
       <section
-        aria-label="Perfect for restaurants, trains, hotel room service, theatres, hospitals, airport lounges and spa salons"
-        className="border-y border-[var(--mkt-border)] bg-[var(--mkt-stage)] px-6 py-16 sm:py-20 lg:py-24"
+        aria-label="Perfect for restaurants, trains, hotel room service and hospitals"
+        className="border-y border-[var(--mkt-border)] bg-[var(--mkt-stage)] px-6 py-10 sm:py-12 lg:py-16"
       >
         <div className="mkt-container">
           <Reveal className="max-w-2xl">
@@ -74,24 +97,18 @@ export function BusinessTypes() {
           </Reveal>
 
           <ul
-            className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6"
+            className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:gap-6"
             onPointerLeave={() => setHovered(null)}
           >
-            {venues.map((v, index) => {
+            {venues.map((v) => {
               const isLead = lead === v.name;
               const isActive = active === v.name;
               const dimmed = lead !== null && !isLead;
-              // Seventh card sits alone on the last row: centre it.
-              const isLast = index === venues.length - 1;
 
               return (
                 <li
                   key={v.name}
-                  className={`relative ${
-                    isLast
-                      ? "sm:col-span-2 sm:mx-auto sm:w-[calc(50%-0.625rem)] lg:col-span-1 lg:col-start-2 lg:mx-0 lg:w-full"
-                      : ""
-                  }`}
+                  className="relative"
                   // Raise immediately when gaining focus; drop only after the
                   // card has finished shrinking so it never slips under a neighbour.
                   style={{
@@ -135,7 +152,7 @@ export function BusinessTypes() {
                         src={v.image}
                         alt={`${v.name} venue`}
                         fill
-                        sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                        sizes="(min-width: 640px) 50vw, 100vw"
                         className="object-cover"
                         style={{ objectPosition: v.position }}
                         draggable={false}

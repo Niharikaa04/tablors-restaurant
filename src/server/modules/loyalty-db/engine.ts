@@ -136,5 +136,5 @@ export function normalizePhone(raw: unknown): string | null {
 }
 
 export function maskPhone(phone: string): string {
-  return phone.length >= 10 ? `${phone.slice(0, 2)}••••••${phone.slice(-2)}` : phone;
+  return phone.length >= 10 ? `${phone.slice(0, 2)}${"*".repeat(phone.length - 4)}${phone.slice(-2)}` : phone;
 }

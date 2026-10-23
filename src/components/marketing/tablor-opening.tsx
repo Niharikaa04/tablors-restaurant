@@ -22,16 +22,15 @@ import { motion, useReducedMotion } from "motion/react";
  */
 
 /**
- * width / height of tablor-ordering-device-front.png, exactly (e.g. 1600x800
- * → 2). The back image is letterboxed inside the same box by object-contain.
+ * width / height of device-views/front.webp, exactly (1600x637). The back image is letterboxed inside the same box by object-contain.
  */
-const DEVICE_ASPECT = 2;
+const DEVICE_ASPECT = 1600 / 637;
 
 /** Where the push zooms toward, in % of the device box (roughly the screen). */
 const PUSH_ORIGIN = "62% 55%";
 
-const FRONT_SRC = "/images/tablor-ordering-device-front.webp";
-const BACK_SRC = "/images/tablor-ordering-device-back.webp";
+const FRONT_SRC = "/images/device-views/front.webp";
+const BACK_SRC = "/images/device-views/back.webp";
 
 const FADE_MS = 500;
 /** Length of the push toward the screen, then the gate fades. */
@@ -293,7 +292,7 @@ export function TablorOpening() {
               >
                 <Image
                   src={FRONT_SRC}
-                  alt="Tablor ordering terminal, front view: silver panel with a numeric keypad, order buttons, built-in LCD and a black handset on top"
+                  alt="Tablor ordering terminal, front view: silver panel with a numeric keypad, order buttons, built-in LCD order display"
                   fill
                   priority
                   sizes="(min-width: 1024px) 1000px, 92vw"

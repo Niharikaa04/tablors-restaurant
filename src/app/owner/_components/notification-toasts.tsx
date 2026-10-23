@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, X } from "lucide-react";
+import { CircleCheck, X } from "lucide-react";
 
 type Item = {
   id: string;
+  type?: string;
   title: string;
   message: string;
   href: string;
@@ -83,10 +84,14 @@ export function NotificationToasts() {
         return;
       }
 
-      const fresh = items.filter((n) => !n.read && !seen.current!.has(n.id));
-      if (fresh.length === 0) return;
-      fresh.forEach((n) => seen.current!.add(n.id));
+      const unseen = items.filter((n) => !n.read && !seen.current!.has(n.id));
+      if (unseen.length === 0) return;
+      // Everything is marked seen, but only "payment received" pops up.
+      // All other alerts live in the bell on the Overview page.
+      unseen.forEach((n) => seen.current!.add(n.id));
       saveSeen(seen.current);
+      const fresh = unseen.filter((n) => n.type === "payment_received");
+      if (fresh.length === 0) return;
 
       setToasts((list) => [...fresh.reverse(), ...list].slice(0, 4));
       for (const n of fresh) {
@@ -131,15 +136,9 @@ export function NotificationToasts() {
         <div
           key={n.id}
           role="status"
-          className={`pointer-events-auto flex items-start gap-3 rounded-xl border bg-zinc-950 p-3 shadow-2xl ${
-            n.severity === "critical"
-              ? "border-red-500/60"
-              : n.severity === "warning"
-                ? "border-amber-400/60"
-                : "border-zinc-700"
-          }`}
+          className="pointer-events-auto flex items-start gap-3 rounded-xl border border-emerald-400/70 bg-emerald-600 p-3 text-white shadow-2xl shadow-emerald-900/40"
         >
-          <Bell className="mt-0.5 h-4 w-4 shrink-0 text-[var(--radium-green)]" aria-hidden />
+          <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-white" aria-hidden />
           <Link
             href={n.href}
             onClick={() => {
@@ -148,14 +147,14 @@ export function NotificationToasts() {
             }}
             className="min-w-0 flex-1"
           >
-            <span className="block truncate text-sm font-medium text-zinc-100">{n.title}</span>
-            <span className="block text-xs text-zinc-400">{n.message}</span>
+            <span className="block truncate text-sm font-semibold text-white">{n.title}</span>
+            <span className="block text-xs text-emerald-50/90">{n.message}</span>
           </Link>
           <button
             type="button"
             aria-label="Dismiss notification"
             onClick={() => dismiss(n.id)}
-            className="rounded p-1 text-zinc-500 hover:text-zinc-200"
+            className="rounded p-1 text-emerald-100/80 hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>
