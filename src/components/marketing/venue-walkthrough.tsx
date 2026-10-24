@@ -6,6 +6,10 @@ import { motion, useReducedMotion } from "motion/react";
 
 const FRONT_SRC = "/images/device-views/front.webp";
 const BACK_SRC = "/images/device-views/back.webp";
+const HANDSET_FRONT_SRC = "/images/device-views/tablor-handset-front.png";
+const HANDSET_BACK_SRC = "/images/device-views/tablor-handset-back.png";
+/** Venues whose walkthrough shows the handset terminal (matched on venue.name). */
+const HANDSET_VENUES = new Set(["Hotel Room Service", "Hospitals"]);
 /** width / height of the front image. Set from the real file. */
 const ASPECT = 1600 / 637;
 
@@ -78,6 +82,11 @@ export function VenueWalkthrough({
 
   const last = STEPS.length - 1;
   const s = STEPS[step];
+
+  // Handset terminal images for Hotel Room Service and Hospitals only.
+  const handset = !!venue && HANDSET_VENUES.has(venue.name);
+  const frontSrc = handset ? HANDSET_FRONT_SRC : FRONT_SRC;
+  const backSrc = handset ? HANDSET_BACK_SRC : BACK_SRC;
 
   // Open/close the native modal dialog (focus trap, Esc, focus return built in).
   useEffect(() => {
@@ -156,8 +165,12 @@ export function VenueWalkthrough({
               aria-hidden={s.image !== "front"}
             >
               <Image
-                src={FRONT_SRC}
-                alt="Tablor TBL-01 countertop ordering terminal, front view"
+                src={frontSrc}
+                alt={
+                  handset
+                    ? "Tablor ordering terminal with telephone handset, front view"
+                    : "Tablor TBL-01 countertop ordering terminal, front view"
+                }
                 fill
                 sizes="(min-width: 1024px) 960px, 96vw"
                 className="object-contain"
@@ -172,8 +185,12 @@ export function VenueWalkthrough({
               aria-hidden={s.image !== "back"}
             >
               <Image
-                src={BACK_SRC}
-                alt="Tablor TBL-01 countertop ordering terminal, back view with the TABLE 05 label"
+                src={backSrc}
+                alt={
+                  handset
+                    ? "Tablor ordering terminal with telephone handset, rear view with a plain back panel"
+                    : "Tablor TBL-01 countertop ordering terminal, back view with the TABLE 05 label"
+                }
                 fill
                 sizes="(min-width: 1024px) 960px, 96vw"
                 className="object-contain"

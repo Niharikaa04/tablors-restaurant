@@ -21,13 +21,6 @@ const venues = [
     position: "center",
   },
   {
-    name: "Trains",
-    blurb: "Convenient onboard ordering for a smoother journey.",
-    image: "/images/train.webp",
-    popupImage: "/images/train.webp",
-    position: "center",
-  },
-  {
     name: "Hotel Room Service",
     blurb: "Let guests request food and service directly from their room.",
     image: "/images/hotel.webp",
