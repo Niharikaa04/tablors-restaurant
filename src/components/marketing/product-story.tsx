@@ -203,10 +203,11 @@ function StoryStep({ step, first }: { step: Step; first: boolean }) {
 function DeviceImageVisual() {
   return (
     <div className="mx-auto w-full">
-      <TablorDeviceImage
-        sizes="(min-width: 1024px) 28rem, 92vw"
-        className="drop-shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
-      />
+     <TablorDeviceImage
+       alt=""
+       sizes="(min-width: 1024px) 28rem, 92vw"
+      className="drop-shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
+    />
     </div>
   );
 }

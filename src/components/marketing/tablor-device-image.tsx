@@ -18,17 +18,19 @@ export function TablorDeviceImage({
   className = "",
   sizes,
   priority = false,
+  alt = DEVICE_IMAGE.alt,
 }: {
   className?: string;
   sizes: string;
   priority?: boolean;
+  alt?: string;
 }) {
   return (
     <Image
       src={DEVICE_IMAGE.src}
       width={DEVICE_IMAGE.width}
       height={DEVICE_IMAGE.height}
-      alt={DEVICE_IMAGE.alt}
+      alt={alt}
       sizes={sizes}
       priority={priority}
       className={`block h-auto w-full ${className}`}

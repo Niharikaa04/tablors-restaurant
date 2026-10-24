@@ -5,7 +5,7 @@ import { StaggerGroup, StaggerItem } from "./motion/stagger";
 const features = [
   { title: "Your Menu, Right Here", body: "Look through the dishes and see what you'd like to eat." },
   { title: "Order Your Way", body: "Pick your dishes, choose how many you want, and place your order." },
-  { title: "Your Bill, Updated", body: "Add or remove items and see your bill change.." },
+  { title: "Your Bill, Updated", body: "Add or remove items and see your bill change." },
   { title: "Scan & Pay", body: "Scan the QR code and pay using your UPI app." },
   { title: "No Help Needed", body: "Everything is simple to follow, from choosing dishes to placing your order." },
 ];

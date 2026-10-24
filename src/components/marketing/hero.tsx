@@ -174,8 +174,8 @@ export function Hero() {
               sm:text-[17px]
             "
           >
-            Customers select items on the countertop device, and the order goes
-            directly to your kitchen.
+            Tablor is an ordering device for the table. Guests choose what they want on
+            it, and the order goes straight to the kitchen.
           </motion.p>
 
           <motion.div

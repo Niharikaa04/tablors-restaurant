@@ -39,6 +39,7 @@ export function Specifications() {
       <div className="mkt-container grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_1fr] lg:items-center lg:gap-16">
         <Reveal className="mx-auto w-full max-w-xl lg:max-w-none">
           <TablorDeviceImage
+            alt=""
             sizes="(min-width: 1024px) 45vw, 92vw"
             className="drop-shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
           />

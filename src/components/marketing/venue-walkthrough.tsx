@@ -14,60 +14,138 @@ const HANDSET_VENUES = new Set(["Hotel Room Service", "Hospitals"]);
 const ASPECT = 1600 / 637;
 
 type Focus = { x: number; y: number; scale: number };
-type Step = {
-  title: string;
-  text: string;
+/** Every venue walks through the same seven steps, so each list has exactly seven entries. */
+type Seven<T> = readonly [T, T, T, T, T, T, T];
+type StepView = {
   image: "front" | "back";
   /** Where to zoom, in % of the image. PLACEHOLDER guesses: tune per step. */
   focus?: Focus;
 };
+type StepCopy = { title: string; text: string };
+type Step = StepView & StepCopy;
 
 /*
- * Only things visible on the supplied photos (keypad, QTY keys, button
- * labels, LCD columns, TABLE 05 label) or already stated in
- * the site copy (order goes to the kitchen; owner sees tables, orders, bills).
+ * What each step shows (front/back photo and zoom area). Shared by every
+ * venue, so the images and animation stay the same; only the words change.
  */
-const STEPS: Step[] = [
+const STEP_VIEWS: Seven<StepView> = [
+  { image: "front" },
+  { image: "front", focus: { x: 16, y: 55, scale: 3 } },
+  { image: "front", focus: { x: 77, y: 53, scale: 2.4 } },
+  { image: "front", focus: { x: 35, y: 33, scale: 3 } },
+  { image: "front", focus: { x: 38, y: 57, scale: 2.2 } },
+  { image: "back" },
+  { image: "front" },
+];
+
+/*
+ * Words for each step, per venue. Built only from what the photos show
+ * (keypad, QTY keys, button labels, LCD columns, number label) or what the
+ * site already says (order goes to the kitchen; the owner or staff see every
+ * order and bill in one place).
+ * TO CONFIRM before publishing (hotel and hospital copy): what the handset
+ * does, that each terminal is set up per room or bed, and that the call
+ * button reaches hotel or hospital staff.
+ */
+const RESTAURANT_COPY: Seven<StepCopy> = [
   {
     title: "Meet the TBL-01",
     text: "A countertop ordering terminal that sits on every table, so guests can order without waiting.",
-    image: "front",
   },
   {
     title: "Choose with the keypad",
     text: "Type an item code on the numeric keypad and set the quantity with the QTY keys.",
-    image: "front",
-    focus: { x: 16, y: 55, scale: 3 },
   },
   {
     title: "See the order on the screen",
     text: "The built-in display lists each item with its code, quantity and price, plus the total.",
-    image: "front",
-    focus: { x: 77, y: 53, scale: 2.4 },
   },
   {
     title: "Confirm to send",
     text: "Press Confirm Order and the order goes straight to the kitchen.",
-    image: "front",
-    focus: { x: 35, y: 33, scale: 3 },
   },
   {
     title: "Ask for help or the bill",
     text: "Dedicated buttons let guests call a waiter, generate the bill, clear the order or leave feedback.",
-    image: "front",
-    focus: { x: 38, y: 57, scale: 2.2 },
   },
   {
     title: "Every table has a number",
     text: "Each terminal is labelled with its table number, so the order shows which table it came from.",
-    image: "back",
   },
   {
     title: "Kitchen and owner stay in sync",
     text: "The kitchen sees the order on screen and prepares it. The owner sees every table, order and bill in one place.",
-    image: "front",
   },
 ];
+
+const HOTEL_COPY: Seven<StepCopy> = [
+  {
+    title: "Meet Tablor in the room",
+    text: "A Tablor terminal sits in the guest room, so guests can order food and ask for room service without leaving the room.",
+  },
+  {
+    title: "Choose with the keypad",
+    text: "The guest types an item code on the numeric keypad and sets the quantity with the QTY keys.",
+  },
+  {
+    title: "Check the order on the screen",
+    text: "The display lists each item with its code, quantity and price, plus the total, so the guest can check before sending.",
+  },
+  {
+    title: "Confirm to send",
+    text: "The guest presses Confirm Order and the order goes straight to the hotel kitchen.",
+  },
+  {
+    title: "Ask for service or the bill",
+    text: "Dedicated buttons let guests call hotel staff, ask for their bill, clear the order or leave feedback.",
+  },
+  {
+    title: "Every room has a number",
+    text: "Each terminal is set up for one room, so every order shows which room it came from.",
+  },
+  {
+    title: "Kitchen and staff stay in sync",
+    text: "The kitchen sees each room order on screen and prepares it. Hotel staff see every room's orders and bills in one place.",
+  },
+];
+
+const HOSPITAL_COPY: Seven<StepCopy> = [
+  {
+    title: "Meet Tablor at the bedside",
+    text: "A Tablor terminal sits by the patient's bed or in the room, so patients or their attendants can request meals and other available services.",
+  },
+  {
+    title: "Choose with the keypad",
+    text: "The patient or attendant types a meal code on the numeric keypad and sets the quantity with the QTY keys.",
+  },
+  {
+    title: "Check the request on the screen",
+    text: "The display lists each item with its code, quantity and price, plus the total, so they can check before sending.",
+  },
+  {
+    title: "Confirm to send the request",
+    text: "Press Confirm Order and the meal request goes straight to the hospital kitchen.",
+  },
+  {
+    title: "Ask hospital staff for help",
+    text: "Dedicated buttons let patients or attendants call hospital staff, ask for the bill, clear the request or leave feedback.",
+  },
+  {
+    title: "Every bed or room has a number",
+    text: "Each terminal is set up for one room or bed, so every request shows where it came from.",
+  },
+  {
+    title: "Kitchen and staff stay in sync",
+    text: "The kitchen sees each meal request on screen and prepares it. Hospital staff can follow every room's requests in one place and keep service running smoothly.",
+  },
+];
+
+/** Keyed by the venue name used in business-types.tsx. Unknown names fall back to the restaurant steps. */
+const COPY_BY_VENUE: Record<string, Seven<StepCopy>> = {
+  Restaurants: RESTAURANT_COPY,
+  "Hotel Room Service": HOTEL_COPY,
+  Hospitals: HOSPITAL_COPY,
+};
 
 export function VenueWalkthrough({
   venue,
@@ -80,8 +158,11 @@ export function VenueWalkthrough({
   const ref = useRef<HTMLDialogElement>(null);
   const [step, setStep] = useState(0);
 
-  const last = STEPS.length - 1;
-  const s = STEPS[step];
+  // Words follow the selected venue; images and zoom stay shared.
+  const copy = (venue && COPY_BY_VENUE[venue.name]) || RESTAURANT_COPY;
+  const steps: Step[] = STEP_VIEWS.map((view, i) => ({ ...view, ...copy[i] }));
+  const last = steps.length - 1;
+  const s = steps[step];
 
   // Handset terminal images for Hotel Room Service and Hospitals only.
   const handset = !!venue && HANDSET_VENUES.has(venue.name);
@@ -215,7 +296,7 @@ export function VenueWalkthrough({
                 transition={{ duration: reduce ? 0.01 : 0.4 }}
               >
                 <p className="text-[10px] uppercase tracking-[0.3em] text-[var(--mkt-lime)]">
-                  Step {step + 1} of {STEPS.length}
+                  Step {step + 1} of {steps.length}
                 </p>
                 <h3
                   id="walkthrough-title"
@@ -238,7 +319,7 @@ export function VenueWalkthrough({
           </div>
 
           <div className="mt-4 flex items-center justify-center gap-2" role="group" aria-label="Choose a step">
-            {STEPS.map((st, i) => (
+            {steps.map((st, i) => (
               <button
                 key={st.title}
                 type="button"

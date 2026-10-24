@@ -93,15 +93,18 @@ export function BusinessTypes() {
             className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:gap-6"
             onPointerLeave={() => setHovered(null)}
           >
-            {venues.map((v) => {
+            {venues.map((v, i) => {
               const isLead = lead === v.name;
               const isActive = active === v.name;
               const dimmed = lead !== null && !isLead;
+              // With an odd number of cards, the last one would sit alone on
+              // its row (two-column grid from sm up): let it span the row.
+              const wide = venues.length % 2 === 1 && i === venues.length - 1;
 
               return (
                 <li
                   key={v.name}
-                  className="relative"
+                  className={`relative ${wide ? "sm:col-span-2" : ""}`}
                   // Raise immediately when gaining focus; drop only after the
                   // card has finished shrinking so it never slips under a neighbour.
                   style={{
@@ -123,7 +126,7 @@ export function BusinessTypes() {
                       if (e.currentTarget.matches(":focus-visible")) setFocused(v.name);
                     }}
                     onBlur={() => setFocused(null)}
-                    className={`group relative block aspect-[4/3] w-full overflow-hidden rounded-md border text-left transition-[transform,box-shadow,border-color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--mkt-lime)] motion-reduce:scale-100 motion-reduce:transition-none ${
+                    className={`group relative block aspect-[4/3] ${wide ? "sm:aspect-[8/3] " : ""}w-full overflow-hidden rounded-md border text-left transition-[transform,box-shadow,border-color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--mkt-lime)] motion-reduce:scale-100 motion-reduce:transition-none ${
                       isLead
                         ? `scale-[1.045] border-[var(--mkt-lime)] ${SHADOW_LEAD}`
                         : isActive
@@ -145,7 +148,7 @@ export function BusinessTypes() {
                         src={v.image}
                         alt={`${v.name} venue`}
                         fill
-                        sizes="(min-width: 640px) 50vw, 100vw"
+                        sizes={wide ? "100vw" : "(min-width: 640px) 50vw, 100vw"}
                         className="object-cover"
                         style={{ objectPosition: v.position }}
                         draggable={false}

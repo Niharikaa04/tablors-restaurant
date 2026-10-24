@@ -72,7 +72,7 @@ export function Navbar() {
             src="/brand/tablor-logo.png"
             alt="Tablor's"
             width={120}
-            height={48}
+            height={47}
             priority
             style={{ height: "auto" }}
             className="block h-auto max-h-10 w-[100px] max-w-full object-contain sm:max-h-12 sm:w-[120px]"
